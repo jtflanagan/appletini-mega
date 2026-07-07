@@ -17,7 +17,9 @@ copy is stale and not a repo — don't edit it.
   xcb runpath, license_config_gui rpath), Sipeed floating license configured and **verified
   headless** — `gw_sh` opens the Tcl console with no license error and accepts
   `set_device -name GW5AST-138B GW5AST-LV138PG484AC1/I0`.
-- ⏳ `openFPGALoader.exe` not yet on the WSL PATH. ⏳ `build.tcl` template still TODO.
+- ✅ `openFPGALoader` v0.12.1 callable from WSL via wrapper (Step 4a); `--detect` runs
+  (reports "device not found" until the Tang Mega's USB is bound to a Windows FTDI driver).
+- ⏳ `build.tcl` template still TODO.
 
 ## Toolchain partition (decided)
 
@@ -31,9 +33,11 @@ copy is stale and not a repo — don't edit it.
 
 Cross-boundary flash from the single WSL session (no session switching):
 ```bash
-openFPGALoader.exe -b tangmega138k "$(wslpath -w build/apple2.fs)"
+openFPGALoader -b tangmega138k build/apple2.fs   # path auto-converted; --detect to enumerate
 ```
-`usbipd-win` is already installed on Windows if USB-into-WSL is ever preferred instead.
+`openFPGALoader` here is a **WSL wrapper** at `~/.local/bin/openFPGALoader` (see Step 4a) that
+drives `openFPGALoader.exe` v0.12.1 from `C:\Users\flana\oss-cad-suite` (oss-cad-suite). `usbipd-win` is already
+installed on Windows if USB-into-WSL is ever preferred instead.
 
 ## Board / target
 - **Sipeed Tang Mega 138K**, FPGA **Gowin GW5AST-LV138PG484AC1/I0** (Arora V).
@@ -74,6 +78,24 @@ Optional modern waveform viewer: **Surfer** (`cargo install surfer` or release b
 sudo apt install -y cc65 tio      # 6502 assembler/C toolchain + serial terminal
 ```
 (`tio` is for reference; the live-board USB-UART is driven Windows-side.)
+
+## Step 4a — openFPGALoader (cross-boundary flash from WSL)  ✅ done → v0.12.1
+`openFPGALoader.exe` ships in **oss-cad-suite** at `C:\Users\flana\oss-cad-suite\bin`. It can't
+run "cold" from WSL: its 160 DLLs live in `oss-cad-suite\lib` (not beside the .exe), so a bare
+launch (or a plain PATH symlink) exits **53** (ERROR_BAD_NETPATH / missing DLL). It must be
+driven through `environment.bat`, which sets the Windows PATH + `OPENFPGALOADER_SOJ_DIR`.
+A WSL wrapper at `~/.local/bin/openFPGALoader` (on PATH) handles this; `openFPGALoader.exe`
+is a symlink alias to it. The wrapper auto-converts existing path args to Windows form, so:
+```bash
+openFPGALoader -V          # → openFPGALoader v0.12.1
+openFPGALoader --detect    # enumerates JTAG (needs board + Windows FTDI/WinUSB driver bound)
+openFPGALoader -b tangmega138k build/apple2.fs
+```
+Gotchas baked into the wrapper: WSL→Windows arg passing escapes embedded `"`, so it builds a
+quote-free command line (paths with spaces are rejected, not corrupted — none in this project);
+and it `cd`s to a `/mnt/c` dir first to avoid the "UNC paths not supported" cmd warning.
+`tangmega138k` is a valid board id (ft2232 cable). If `--detect` says "device not found", bind
+the board's USB interface to a Windows driver (Zadig → WinUSB, or the FTDI driver).
 
 ## Step 5 — Gowin EDA (Linux) + floating license  ✅ done (⚠️ was the involved one)
 Using **Gowin_V1.9.12.03_linux** (supports GW5AST-138). ✅ extracted, ✅ all 3 WSL2
@@ -181,8 +203,8 @@ Zener requires **KiCad 10.x** for layout gen/edit.
 ---
 
 ## Open items to nail during setup
-- [ ] Get `openFPGALoader.exe` onto the WSL PATH (symlink or add its Windows dir) so the cross-boundary flash line works.
 - [ ] Author `build.tcl` template (device string, options, `.cst`/`.sdc`, reports).
+- [x] ~~Get `openFPGALoader.exe` onto the WSL PATH~~ → wrapper at `~/.local/bin/openFPGALoader` drives oss-cad-suite v0.12.1 (Step 4a).
 - [ ] Confirm whether the Tang Mega 138K is `-name GW5AST-138B` or `GW5AST-138C` (both parse; needs board/silicon check).
 - [x] ~~Exact Gowin download + headless floating-license path~~ → V1.9.12.03; license in `/opt/gowin/IDE/bin/gwlicense.ini` = `lic="gowinlic.sipeed.com:10559"`; `gw_sh` verified.
 - [x] ~~Confirm KiCad 10 PPA name for 24.04~~ → `ppa:kicad/kicad-10.0-releases`, installs 10.0.4.
