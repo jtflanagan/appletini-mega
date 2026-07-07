@@ -2,8 +2,20 @@
 
 Runbook for standing up the full development toolchain. Execute the install steps
 **inside a VS Code + Claude Code session attached to the Ubuntu 24.04 WSL2 distro**
-(sudo works interactively there). This file lives on the Windows side and is
-reachable from WSL at `/mnt/c/repos/appletini-mega/WSL-DEV-SETUP.md`.
+(sudo works interactively there). Canonical copy now lives in the Linux-FS git
+clone at `~/repos/appletini-mega/WSL-DEV-SETUP.md` (origin
+`git@github.com:jtflanagan/appletini-mega.git`); the loose `/mnt/c/repos/appletini-mega`
+copy is stale and not a repo — don't edit it.
+
+## Status (2026-07-07)
+- ✅ Steps 0, 2, 3, 4 done. Verilator 5.020 (`--timing`), GTKWave 3.3.116, Icarus 12.0,
+  cc65/ca65 2.18, tio 2.7. Trivial Verilator sim runs to `$finish`.
+- ✅ Step 6 `pcb` 0.4.4 (pcbc 0.4.4) in `~/.local/bin`. ✅ Step 7 KiCad **10.0.4**.
+- ✅ Repo already Linux-FS cloned at `~/repos/appletini-mega` (project-location item settled).
+- ✅ Passwordless sudo enabled via `/etc/sudoers.d/flana-nopasswd`.
+- ⏳ **Step 5 Gowin**: runtime libs installed, but the EDA tarball still needs a manual
+  registered download + license GUI. ⏳ `openFPGALoader.exe` not yet on the WSL PATH.
+  ⏳ `build.tcl` template still TODO.
 
 ## Toolchain partition (decided)
 
@@ -81,15 +93,22 @@ sudo apt install -y cc65 tio      # 6502 assembler/C toolchain + serial terminal
 
 Reference for Linux/container quirks: github.com/homelith/dockerized-gowin-template
 
-## Step 6 — Diode `pcb` (Zener)
-Install the Rust binary release from github.com/diodeinc/pcb (script or `cargo install`).
-Verify: `pcb --version`. (NB: Ubuntu's apt `pcb` is the unrelated gEDA layout editor — do not use.)
-
-## Step 7 — KiCad 10.x (on 24.04)
-PPA route (verify exact PPA for v10):
+## Step 6 — Diode `pcb` (Zener)  ✅ done → 0.4.4
+Install via the official shim script (downloads a SHA-256-verified prebuilt binary to
+`~/.local/bin`, adds it to PATH; no sudo). The `pcb` shim then fetches the `pcbc`
+toolchain per-project on first use:
 ```bash
-sudo add-apt-repository ppa:kicad/kicad-releases && sudo apt update && sudo apt install -y kicad
-kicad-cli version
+curl -fsSL https://raw.githubusercontent.com/diodeinc/pcb/main/install.sh | bash
+exec bash && pcb --version   # → pcbc 0.4.4
+```
+(NB: Ubuntu's apt `pcb` is the unrelated gEDA layout editor — do not use.)
+
+## Step 7 — KiCad 10.x (on 24.04)  ✅ done → 10.0.4
+PPA route (the KiCad team versions PPAs per release series; the old generic
+`kicad-releases` no longer exists — using it silently falls back to Ubuntu's stock 7.0.11):
+```bash
+sudo add-apt-repository ppa:kicad/kicad-10.0-releases && sudo apt update && sudo apt install -y kicad
+kicad-cli version   # → 10.0.4~ubuntu24.04.1
 ```
 Flatpak fallback: `flatpak install flathub org.kicad.KiCad`.
 Zener requires **KiCad 10.x** for layout gen/edit.
@@ -105,6 +124,7 @@ Zener requires **KiCad 10.x** for layout gen/edit.
 
 ## Open items to nail during setup
 - [ ] Exact Gowin Linux download/version for GW5AST-138 + confirm floating-license config path for headless `gw_sh`.
-- [ ] Confirm KiCad 10 PPA name for 24.04 (else flatpak).
+- [ ] Get `openFPGALoader.exe` onto the WSL PATH (symlink or add its Windows dir) so the cross-boundary flash line works.
 - [ ] Author `build.tcl` template (device string, options, `.cst`/`.sdc`, reports).
-- [ ] Decide project location: clone into Linux FS vs work on `/mnt/c` (sim I/O speed vs single path for Windows tools).
+- [x] ~~Confirm KiCad 10 PPA name for 24.04~~ → `ppa:kicad/kicad-10.0-releases`, installs 10.0.4.
+- [x] ~~Decide project location~~ → Linux FS at `~/repos/appletini-mega` (fast sim I/O).
