@@ -11,7 +11,7 @@ Subsystems:
   - sdram        2x Winbond W9825G6KH 16-bit SDR, wired as one 32-bit-wide bus (fetch path)
   - programming  FT2232H (ch.A = JTAG/MPSSE, ch.B = UART console) + 12 MHz xtal + USB-C
   - usb3         WCH CH569 HSPI<->USB3 SuperSpeed bridge + 30 MHz xtal + USB3 connector
-  - (later)      6502/65816 CPU-socket bus interface + 5V<->3.3V level shifting
+  - cpu_socket   6502/65816 CPU-socket bus interface (LXC level shifters + deadman reset)
 """
 
 SomBtb = Module("modules/som_btb.zen")
@@ -19,6 +19,7 @@ Power = Module("modules/power.zen")
 Sdram = Module("modules/sdram.zen")
 Programming = Module("modules/programming.zen")
 Usb3Bridge = Module("modules/usb3.zen")
+CpuSocket = Module("modules/cpu_socket.zen")
 
 Board(
     name="appletini-mega",
@@ -31,3 +32,4 @@ Power(name="PWR")
 Sdram(name="SDRAM")
 Programming(name="PROG")
 Usb3Bridge(name="USB3")
+CpuSocket(name="CPU")

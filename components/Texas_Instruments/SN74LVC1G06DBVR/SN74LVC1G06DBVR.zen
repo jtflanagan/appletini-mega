@@ -1,0 +1,17 @@
+"""
+SN74LVC1G06DBVR
+
+Auto-generated using `pcb search`.
+"""
+
+A = io(Net)
+GND = io(Net)
+NC = io(Net)
+VCC = io(Net)
+Y = io(Net)
+
+Component(
+    name="SN74LVC1G06DBVR",
+    symbol=Symbol(library="SN74LVC1G06DBVR.kicad_sym"),
+    pins={"A": A, "GND": GND, "NC": NC, "VCC": VCC, "Y": Y},
+)

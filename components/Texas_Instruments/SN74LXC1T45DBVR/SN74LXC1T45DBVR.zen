@@ -1,0 +1,18 @@
+"""
+SN74LXC1T45DBVR
+
+Auto-generated using `pcb search`.
+"""
+
+A = io(Net)
+B = io(Net)
+DIR = io(Net)
+GND = io(Net)
+VCCA = io(Net)
+VCCB = io(Net)
+
+Component(
+    name="SN74LXC1T45DBVR",
+    symbol=Symbol(library="SN74LXC1T45DBVR.kicad_sym"),
+    pins={"A": A, "B": B, "DIR": DIR, "GND": GND, "VCCA": VCCA, "VCCB": VCCB},
+)

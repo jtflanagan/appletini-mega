@@ -1,0 +1,55 @@
+"""
+SN74LXC8T245PWR
+
+Auto-generated using `pcb search`.
+"""
+
+A1 = io(Net)
+A2 = io(Net)
+A3 = io(Net)
+A4 = io(Net)
+A5 = io(Net)
+A6 = io(Net)
+A7 = io(Net)
+A8 = io(Net)
+B1 = io(Net)
+B2 = io(Net)
+B3 = io(Net)
+B4 = io(Net)
+B5 = io(Net)
+B6 = io(Net)
+B7 = io(Net)
+B8 = io(Net)
+DIR = io(Net)
+GND = io(Net)
+N_OE = io(Net)
+VCCA = io(Net)
+VCCB = io(Net)
+
+Component(
+    name="SN74LXC8T245PWR",
+    symbol=Symbol(library="SN74LXC8T245PWR.kicad_sym"),
+    pins={
+        "A1": A1,
+        "A2": A2,
+        "A3": A3,
+        "A4": A4,
+        "A5": A5,
+        "A6": A6,
+        "A7": A7,
+        "A8": A8,
+        "B1": B1,
+        "B2": B2,
+        "B3": B3,
+        "B4": B4,
+        "B5": B5,
+        "B6": B6,
+        "B7": B7,
+        "B8": B8,
+        "DIR": DIR,
+        "GND": GND,
+        "VCCA": VCCA,
+        "VCCB": VCCB,
+        "~{OE}": N_OE,
+    },
+)
