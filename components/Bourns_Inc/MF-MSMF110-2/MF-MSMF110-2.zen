@@ -1,0 +1,14 @@
+"""
+MF-MSMF110-2
+
+Auto-generated using `pcb search`.
+"""
+
+P1 = io(Net)
+P2 = io(Net)
+
+Component(
+    name="MF-MSMF110-2",
+    symbol=Symbol(library="MF-MSMF110-2.kicad_sym"),
+    pins={"1": P1, "2": P2},
+)

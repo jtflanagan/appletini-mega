@@ -1,0 +1,15 @@
+"""
+AO3401A
+
+Auto-generated using `pcb search`.
+"""
+
+D = io(Net)
+G = io(Net)
+S = io(Net)
+
+Component(
+    name="AO3401A",
+    symbol=Symbol(library="AO3401A.kicad_sym"),
+    pins={"D": D, "G": G, "S": S},
+)

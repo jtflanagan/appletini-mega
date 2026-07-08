@@ -1,10 +1,10 @@
 # Tang Mega 60K SOM — BTB physical pin map (all 280 pins)
 
-Transcribed from the SOM schematic (BTB Connector sheet) + the dock schematic `SOM_BTB0`/`SOM_BTB1&2` sheets (clean text extract). NOT from the KiCad repo.
+Transcribed from the SOM schematic (BTB Connector sheet) + the dock schematic `SOM_BTB0`/`SOM_BTB1&2` sheets. NOT from the KiCad repo.
 
-Carrier mating receptacles: **2× DF40HC(3.0)-100DS-0.4V(51)** + **1× DF40HC(3.0)-80DS-0.4V(51)**, 0.4 mm pitch, 3.0 mm stack height (matches the dock's parts).
+Carrier mating receptacles: **2x DF40HC(3.0)-100DS-0.4V(51)** + **1x DF40HC(3.0)-80DS-0.4V(51)**, 0.4 mm pitch, 3.0 mm stack height.
 
-Net names are the SOM nets (`BANKx_ball_IOfunc`). `VCCO_n/m` = per-bank VCCIO (3.3 V). Pins flagged `?`/`NC?` need a final check vs the SOM mechanical spec.
+Net names are SOM nets (`BANKx_ball_IOfunc`). `VCCO_n/m`/`VCCIO_*` = per-bank VCCIO (3.3 V). `NC` = no SOM connection (verified). DONE=`BANK3_G11`, READY=`BANK3_U12` per the SOM sheet (the dock text mislabels DONE's ball as U12).
 
 
 ## C2399 — 100-pin — BANK1/2 (SDRAM0 side) + Q0/Q1 SerDes
@@ -99,18 +99,18 @@ Net names are the SOM nets (`BANKx_ball_IOfunc`). `VCCO_n/m` = per-bank VCCIO (3
 | 61 | BANK4_K14_IOR36B | 62 | AB13_IOB54A |
 | 63 | BANK4_K13_IOR36A | 64 | Y12_IOB52A |
 | 65 | GND | 66 | AB12_IOB18A |
-| 67 | VCCIO_138B5? | 68 | V10_IOB71B |
+| 67 | VCCIO_138B5 | 68 | V10_IOB71B |
 | 69 | BANK3_U9_IOR11B | 70 | W11_IOB35A |
 | 71 | BANK3_U10_IOR7A | 72 | Y11_IOB20B |
 | 73 | BANK3_U11_IOR7B | 74 | W10_IOB35B |
 | 75 | BANK3_U8_IOR11A | 76 | AB11_IOB18B |
-| 77 | NC? | 78 | AA11_IOB20A |
+| 77 | NC | 78 | AA11_IOB20A |
 | 79 | GND | 80 | AB10_IOB3B |
 | 81 | GND | 82 | AA10_IOB1B |
 | 83 | GND | 84 | AA9_IOB1A |
 | 85 | GND | 86 | W12_IOB52B |
 | 87 | GND | 88 | BANK3_V13_IOR15B |
-| 89 | NC? | 90 | BANK4_T14_IOR20A |
+| 89 | NC | 90 | BANK4_T14_IOR20A |
 | 91 | 5V | 92 | N9_ADCTN |
 | 93 | 5V | 94 | N10_ADCTP |
 | 95 | 5V | 96 | M9_ADCVN |
@@ -159,5 +159,5 @@ Net names are the SOM nets (`BANKx_ball_IOfunc`). `VCCO_n/m` = per-bank VCCIO (3
 | 71 | BANK2_E18_IOT117B | 72 | BANK2_F21_IOT142A |
 | 73 | BANK2_C22_IOT133A | 74 | BANK2_E22_IOT140A |
 | 75 | BANK2_B22_IOT133B | 76 | BANK2_D22_IOT140B |
-| 77 | BANK3_U12_IOR9A | 78 | BANK2_E21_IOT138A |
-| 79 | BANK3_U12_IOR5B | 80 | BANK2_D21_IOT138B |
+| 77 | BANK3_G11_DONE | 78 | BANK2_E21_IOT138A |
+| 79 | BANK3_U12_READY | 80 | BANK2_D21_IOT138B |

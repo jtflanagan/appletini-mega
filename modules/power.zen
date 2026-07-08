@@ -10,10 +10,10 @@ Both USB-C ports are DATA-ONLY; the barrel jack is the sole power input.
 UNWIRED to other modules this round: rails are local nets here (P12V/P5V/P3V3) and get
 tied to the SOM/IC modules when we wire. Passive values are sensible starting points.
 
-Barrel jack = LCSC/JLCPCB POWER-JACK (3-terminal DC jack). NOTE: its symbol pins are generic
-(1/2/3); mapped by the standard DC-005/044 convention (center=+12V, sleeve=GND, switch=GND) —
-VERIFY pin-to-terminal against the footprint before layout. TODO: add reverse-polarity P-FET +
-fuse for full input protection (TVS is placed).
+Input protection: PPTC resettable fuse (overcurrent) + AO3401A P-FET (reverse-polarity) + TVS.
+Barrel jack = LCSC/JLCPCB POWER-JACK (3-terminal). NOTE: its symbol pins are generic (1/2/3);
+mapped by the standard DC-005/044 convention (center=+12V, sleeve=GND, switch=GND) — VERIFY
+pin-to-terminal against the footprint before layout.
 """
 
 Resistor  = Module("@stdlib/generics/Resistor.zen")
@@ -21,6 +21,8 @@ Capacitor = Module("@stdlib/generics/Capacitor.zen")
 Inductor  = Module("@stdlib/generics/Inductor.zen")
 Tvs       = Module("@stdlib/generics/Tvs.zen")
 BarrelJack = Module("../components/JLCPCB_Assembly/POWER-JACK/POWER-JACK.zen")
+Fuse      = Module("../components/Bourns_Inc/MF-MSMF110-2/MF-MSMF110-2.zen")   # 1.1A hold PPTC
+Mosfet    = Module("../components/ElecSuper/AO3401A/AO3401A.zen")              # P-FET, reverse-polarity
 MP2315    = Module("../components/JLCPCB_Assembly/MP2315/MP2315.zen")
 AMS1117   = Module("../components/Fosan/AMS1117-3_3/AMS1117-3_3.zen")
 
@@ -29,9 +31,13 @@ P12V = Power("P12V")
 P5V  = Power("P5V")
 P3V3 = Power("P3V3")
 
-# ---- input: barrel jack (PLACEHOLDER footprint) + protection ----
-BarrelJack(name="J_PWR", P1=P12V.NET, P2=GND.NET, P3=GND.NET)   # 1=center/+12V, 2=sleeve/GND, 3=switch->GND (verify)
-Tvs(name="D_IN", package="DO-214AA", K=P12V.NET, A=GND)         # SMB input clamp
+# ---- input: barrel jack -> PPTC fuse -> reverse-polarity P-FET -> P12V (protected) ----
+_VIN = Net("VIN_RAW"); _VIN_F = Net("VIN_FUSED"); _PGATE = Net("RP_GATE")
+BarrelJack(name="J_PWR", P1=_VIN, P2=GND.NET, P3=GND.NET)       # 1=center/+12V, 2=sleeve/GND, 3=switch->GND (verify)
+Fuse(name="F_IN", P1=_VIN, P2=_VIN_F)                          # 1.1A resettable PPTC (overcurrent)
+Mosfet(name="Q_RP", D=_VIN_F, S=P12V, G=_PGATE)                # P-FET reverse-polarity: D=in, S=load, G=in-GND
+Resistor(name="R_RP", value="100kohm", package="0402", P1=_PGATE, P2=GND.NET)   # gate to input return
+Tvs(name="D_IN", package="DO-214AA", K=P12V.NET, A=GND)        # SMB clamp on protected rail
 Capacitor(name="C_IN1", value="10uF",  package="1206", P1=P12V.NET, P2=GND.NET)
 Capacitor(name="C_IN2", value="10uF",  package="1206", P1=P12V.NET, P2=GND.NET)
 
