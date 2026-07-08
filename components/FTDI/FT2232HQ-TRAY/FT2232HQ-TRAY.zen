@@ -1,0 +1,119 @@
+"""
+FT2232HQ-TRAY
+
+Auto-generated using `pcb search`.
+"""
+
+ACBUS0 = io(Net)
+ACBUS1 = io(Net)
+ACBUS2 = io(Net)
+ACBUS3 = io(Net)
+ACBUS4 = io(Net)
+ACBUS5 = io(Net)
+ACBUS6 = io(Net)
+ACBUS7 = io(Net)
+ADBUS0 = io(Net)
+ADBUS1 = io(Net)
+ADBUS2 = io(Net)
+ADBUS3 = io(Net)
+ADBUS4 = io(Net)
+ADBUS5 = io(Net)
+ADBUS6 = io(Net)
+ADBUS7 = io(Net)
+AGND = io(Net)
+BCBUS0 = io(Net)
+BCBUS1 = io(Net)
+BCBUS2 = io(Net)
+BCBUS3 = io(Net)
+BCBUS4 = io(Net)
+BCBUS5 = io(Net)
+BCBUS6 = io(Net)
+BCBUS7 = io(Net)
+BDBUS0 = io(Net)
+BDBUS1 = io(Net)
+BDBUS2 = io(Net)
+BDBUS3 = io(Net)
+BDBUS4 = io(Net)
+BDBUS5 = io(Net)
+BDBUS6 = io(Net)
+BDBUS7 = io(Net)
+DM = io(Net)
+DP = io(Net)
+EECLK = io(Net)
+EECS = io(Net)
+EEDATA = io(Net)
+GND = io(Net)
+N_RESET = io(Net)
+N_SUSPEND = io(Net)
+OSCI = io(Net)
+OSCO = io(Net)
+PAD = io(Net)
+PWREN = io(Net)
+REF = io(Net)
+TEST = io(Net)
+VCCIO = io(Net)
+VCORE = io(Net)
+VPHY = io(Net)
+VPLL = io(Net)
+VREGIN = io(Net)
+VREGOUT = io(Net)
+
+Component(
+    name="FT2232HQ-TRAY",
+    symbol=Symbol(library="FT2232HQ-TRAY.kicad_sym"),
+    pins={
+        "ACBUS0": ACBUS0,
+        "ACBUS1": ACBUS1,
+        "ACBUS2": ACBUS2,
+        "ACBUS3": ACBUS3,
+        "ACBUS4": ACBUS4,
+        "ACBUS5": ACBUS5,
+        "ACBUS6": ACBUS6,
+        "ACBUS7": ACBUS7,
+        "ADBUS0": ADBUS0,
+        "ADBUS1": ADBUS1,
+        "ADBUS2": ADBUS2,
+        "ADBUS3": ADBUS3,
+        "ADBUS4": ADBUS4,
+        "ADBUS5": ADBUS5,
+        "ADBUS6": ADBUS6,
+        "ADBUS7": ADBUS7,
+        "AGND": AGND,
+        "BCBUS0": BCBUS0,
+        "BCBUS1": BCBUS1,
+        "BCBUS2": BCBUS2,
+        "BCBUS3": BCBUS3,
+        "BCBUS4": BCBUS4,
+        "BCBUS5": BCBUS5,
+        "BCBUS6": BCBUS6,
+        "BCBUS7": BCBUS7,
+        "BDBUS0": BDBUS0,
+        "BDBUS1": BDBUS1,
+        "BDBUS2": BDBUS2,
+        "BDBUS3": BDBUS3,
+        "BDBUS4": BDBUS4,
+        "BDBUS5": BDBUS5,
+        "BDBUS6": BDBUS6,
+        "BDBUS7": BDBUS7,
+        "DM": DM,
+        "DP": DP,
+        "EECLK": EECLK,
+        "EECS": EECS,
+        "EEDATA": EEDATA,
+        "GND": GND,
+        "OSCI": OSCI,
+        "OSCO": OSCO,
+        "PAD": PAD,
+        "PWREN": PWREN,
+        "REF": REF,
+        "TEST": TEST,
+        "VCCIO": VCCIO,
+        "VCORE": VCORE,
+        "VPHY": VPHY,
+        "VPLL": VPLL,
+        "VREGIN": VREGIN,
+        "VREGOUT": VREGOUT,
+        "~{RESET}": N_RESET,
+        "~{SUSPEND}": N_SUSPEND,
+    },
+)

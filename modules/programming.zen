@@ -1,0 +1,75 @@
+"""
+programming — FT2232H USB bridge: JTAG (config) + UART (console) on one USB-C cable.
+
+FT2232HQ (QFN-56) dual-channel USB 2.0 HS bridge:
+  - Channel A (ADBUS) = MPSSE -> JTAG (TCK/TDI/TDO/TMS) to the SOM BANK12 config pins
+  - Channel B (BDBUS) = UART -> debug console
+Programmed via openFPGALoader; the SOM's own flash is written through the FPGA.
+
+Self-powered from the board 3.3 V; the USB-C port is DATA-ONLY (VBUS only sensed, never
+drawn). 93LC56 holds the FT2232H descriptors. 12 MHz crystal.
+
+UNWIRED to other modules this round: JTAG/UART/rail nets are local labels here.
+NOTE: USB-C = TYPE-C-31-M-12 (16-pin, USB2) — correct for FT2232H (USB2 only).
+"""
+
+Resistor  = Module("@stdlib/generics/Resistor.zen")
+Capacitor = Module("@stdlib/generics/Capacitor.zen")
+Crystal   = Module("@stdlib/generics/Crystal.zen")
+FT2232    = Module("../components/FTDI/FT2232HQ-TRAY/FT2232HQ-TRAY.zen")
+EEPROM    = Module("../components/Microchip_Technology/93LC56_P/93LC56_P.zen")
+USBC      = Module("../components/Korean_Hroparts_Elec/TYPE-C-31-M-12/TYPE-C-31-M-12.zen")
+
+GND  = Ground()
+P3V3 = Power("P3V3")
+P1V8 = Power("FT_1V8")     # FT2232H internal LDO (VREGOUT) rail
+
+# ---- FT2232HQ ----
+_OSCI = Net("FT_OSCI"); _OSCO = Net("FT_OSCO")
+_REF  = Net("FT_REF");  _DP = Net("USB_FT_DP"); _DM = Net("USB_FT_DM")
+_EECLK = Net("FT_EECLK"); _EECS = Net("FT_EECS"); _EEDATA = Net("FT_EEDATA"); _EEDO = Net("FT_EEDO")
+_RST = Net("FT_RESET_N")
+FT2232(
+    name="U_FT",
+    # channel A -> JTAG (unwired local nets), channel B -> UART
+    ADBUS0=Net("FT_JTAG_TCK"), ADBUS1=Net("FT_JTAG_TDI"), ADBUS2=Net("FT_JTAG_TDO"), ADBUS3=Net("FT_JTAG_TMS"),
+    ADBUS4=Net("FT_ADBUS4"), ADBUS5=Net("FT_ADBUS5"), ADBUS6=Net("FT_ADBUS6"), ADBUS7=Net("FT_ADBUS7"),
+    ACBUS0=Net("FT_ACBUS0"), ACBUS1=Net("FT_ACBUS1"), ACBUS2=Net("FT_ACBUS2"), ACBUS3=Net("FT_ACBUS3"),
+    ACBUS4=Net("FT_ACBUS4"), ACBUS5=Net("FT_ACBUS5"), ACBUS6=Net("FT_ACBUS6"), ACBUS7=Net("FT_ACBUS7"),
+    BDBUS0=Net("FT_UART_TX"), BDBUS1=Net("FT_UART_RX"), BDBUS2=Net("FT_UART_RTS"), BDBUS3=Net("FT_UART_CTS"),
+    BDBUS4=Net("FT_BDBUS4"), BDBUS5=Net("FT_BDBUS5"), BDBUS6=Net("FT_BDBUS6"), BDBUS7=Net("FT_BDBUS7"),
+    BCBUS0=Net("FT_BCBUS0"), BCBUS1=Net("FT_BCBUS1"), BCBUS2=Net("FT_BCBUS2"), BCBUS3=Net("FT_BCBUS3"),
+    BCBUS4=Net("FT_BCBUS4"), BCBUS5=Net("FT_BCBUS5"), BCBUS6=Net("FT_BCBUS6"), BCBUS7=Net("FT_BCBUS7"),
+    DP=_DP, DM=_DM,
+    OSCI=_OSCI, OSCO=_OSCO,
+    EECLK=_EECLK, EECS=_EECS, EEDATA=_EEDATA,
+    N_RESET=_RST, N_SUSPEND=Net("FT_SUSPEND_N"), PWREN=Net("FT_PWREN_N"),
+    TEST=GND, REF=_REF,
+    VREGIN=P3V3, VREGOUT=P1V8, VCORE=P1V8, VPLL=P1V8, VPHY=P1V8, VCCIO=P3V3,
+    AGND=GND, GND=GND, PAD=GND,
+)
+# reset pull-up, REF cap, VREGOUT decoupling
+Resistor (name="R_FT_RST", value="10kohm", package="0402", P1=P3V3.NET, P2=_RST)
+Capacitor(name="C_FT_REF", value="100nF", package="0402", P1=_REF,  P2=GND.NET)
+Capacitor(name="C_FT_1V8a",value="4.7uF", package="0603", P1=P1V8.NET, P2=GND.NET)
+Capacitor(name="C_FT_1V8b",value="100nF", package="0402", P1=P1V8.NET, P2=GND.NET)
+Capacitor(name="C_FT_IO1", value="100nF", package="0402", P1=P3V3.NET, P2=GND.NET)
+Capacitor(name="C_FT_IO2", value="100nF", package="0402", P1=P3V3.NET, P2=GND.NET)
+Capacitor(name="C_FT_IO3", value="100nF", package="0402", P1=P3V3.NET, P2=GND.NET)
+
+# ---- 12 MHz crystal ----
+Crystal  (name="Y_FT", package="3225_4Pin", frequency="12MHz", XIN=_OSCI, XOUT=_OSCO, GND=GND.NET)
+Capacitor(name="C_FT_X1", value="18pF", package="0402", P1=_OSCI, P2=GND.NET)
+Capacitor(name="C_FT_X2", value="18pF", package="0402", P1=_OSCO, P2=GND.NET)
+
+# ---- 93LC56 config EEPROM ----
+EEPROM(name="U_EE", CS=_EECS, CLK=_EECLK, DI=_EEDATA, DO=_EEDO, ORG=P3V3.NET, VCC=P3V3.NET, VSS=GND, NU=Net("EE_NU"))
+Resistor(name="R_EE", value="2.2kohm", package="0402", P1=_EEDO, P2=_EEDATA)   # DO -> EEDATA (half-duplex)
+
+# ---- USB-C (data-only) ----
+_CC1 = Net("FT_CC1"); _CC2 = Net("FT_CC2")
+USBC(name="J_USB_FT", VBUS=Net("FT_VBUS_SENSE"),
+     DP1=_DP, DP2=_DP, DN1=_DM, DN2=_DM,
+     CC1=_CC1, CC2=_CC2, SBU1=Net("FT_SBU1"), SBU2=Net("FT_SBU2"), GND=GND.NET, EH=GND.NET)
+Resistor(name="R_FT_CC1", value="5.1kohm", package="0402", P1=_CC1, P2=GND.NET)
+Resistor(name="R_FT_CC2", value="5.1kohm", package="0402", P1=_CC2, P2=GND.NET)

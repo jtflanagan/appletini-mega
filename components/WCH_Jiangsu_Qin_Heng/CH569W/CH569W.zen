@@ -1,0 +1,145 @@
+"""
+CH569W
+
+Auto-generated using `pcb search`.
+"""
+
+GND = io(Net)
+GXM = io(Net)
+GXP = io(Net)
+PA0 = io(Net)
+PA1 = io(Net)
+PA10 = io(Net)
+PA11 = io(Net)
+PA12 = io(Net)
+PA13 = io(Net)
+PA14 = io(Net)
+PA15 = io(Net)
+PA16 = io(Net)
+PA17 = io(Net)
+PA18 = io(Net)
+PA19 = io(Net)
+PA2 = io(Net)
+PA20 = io(Net)
+PA21 = io(Net)
+PA22 = io(Net)
+PA23 = io(Net)
+PA3 = io(Net)
+PA4 = io(Net)
+PA5 = io(Net)
+PA6 = io(Net)
+PA7 = io(Net)
+PA8 = io(Net)
+PA9 = io(Net)
+PB0 = io(Net)
+PB1 = io(Net)
+PB10 = io(Net)
+PB11 = io(Net)
+PB12 = io(Net)
+PB13 = io(Net)
+PB14 = io(Net)
+PB15 = io(Net)
+PB16 = io(Net)
+PB17 = io(Net)
+PB18 = io(Net)
+PB19 = io(Net)
+PB2 = io(Net)
+PB20 = io(Net)
+PB21 = io(Net)
+PB22 = io(Net)
+PB23 = io(Net)
+PB24 = io(Net)
+PB3 = io(Net)
+PB4 = io(Net)
+PB5 = io(Net)
+PB6 = io(Net)
+PB7 = io(Net)
+PB8 = io(Net)
+PB9 = io(Net)
+SSRXA = io(Net)
+SSRXB = io(Net)
+SSTXA = io(Net)
+SSTXB = io(Net)
+UD_NEG = io(Net)
+UD_POS = io(Net)
+V12CORE = io(Net)
+V12USB = io(Net)
+V33GX = io(Net)
+V33LDO = io(Net)
+V33USB = io(Net)
+VDDIO = io(Net)
+XI = io(Net)
+XO = io(Net)
+
+Component(
+    name="CH569W",
+    symbol=Symbol(library="CH569W.kicad_sym"),
+    pins={
+        "GND": GND,
+        "GXM": GXM,
+        "GXP": GXP,
+        "PA0": PA0,
+        "PA1": PA1,
+        "PA10": PA10,
+        "PA11": PA11,
+        "PA12": PA12,
+        "PA13": PA13,
+        "PA14": PA14,
+        "PA15": PA15,
+        "PA16": PA16,
+        "PA17": PA17,
+        "PA18": PA18,
+        "PA19": PA19,
+        "PA2": PA2,
+        "PA20": PA20,
+        "PA21": PA21,
+        "PA22": PA22,
+        "PA23": PA23,
+        "PA3": PA3,
+        "PA4": PA4,
+        "PA5": PA5,
+        "PA6": PA6,
+        "PA7": PA7,
+        "PA8": PA8,
+        "PA9": PA9,
+        "PB0": PB0,
+        "PB1": PB1,
+        "PB10": PB10,
+        "PB11": PB11,
+        "PB12": PB12,
+        "PB13": PB13,
+        "PB14": PB14,
+        "PB15": PB15,
+        "PB16": PB16,
+        "PB17": PB17,
+        "PB18": PB18,
+        "PB19": PB19,
+        "PB2": PB2,
+        "PB20": PB20,
+        "PB21": PB21,
+        "PB22": PB22,
+        "PB23": PB23,
+        "PB24": PB24,
+        "PB3": PB3,
+        "PB4": PB4,
+        "PB5": PB5,
+        "PB6": PB6,
+        "PB7": PB7,
+        "PB8": PB8,
+        "PB9": PB9,
+        "SSRXA": SSRXA,
+        "SSRXB": SSRXB,
+        "SSTXA": SSTXA,
+        "SSTXB": SSTXB,
+        "UD+": UD_POS,
+        "UD-": UD_NEG,
+        "V12CORE": V12CORE,
+        "V12USB": V12USB,
+        "V33GX": V33GX,
+        "V33LDO": V33LDO,
+        "V33USB": V33USB,
+        "VDDIO": VDDIO,
+        "XI": XI,
+        "XO": XO,
+    },
+)

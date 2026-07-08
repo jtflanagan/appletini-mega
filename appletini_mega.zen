@@ -1,0 +1,33 @@
+"""
+appletini-mega — Apple II/IIgs accelerator carrier for a Sipeed Tang Mega 60K SOM.
+
+Top-level board. This round instantiates each subsystem so every part is *allocated*.
+Inter-subsystem wiring is intentionally deferred (see CARRIER_PLAN.md — "wiring is a big
+discussion"): modules are placed but their external nets are left unconnected for now.
+
+Subsystems:
+  - som_btb      Tang Mega 60K SOM board-to-board (DF40) connectors + all labeled pins
+  - power        12 V barrel -> buck 5 V (VBUS_SOM) -> 3.3 V (VCCIO / logic / IC rails)
+  - sdram        2x Winbond W9825G6KH 16-bit SDR, wired as one 32-bit-wide bus (fetch path)
+  - programming  FT2232H (ch.A = JTAG/MPSSE, ch.B = UART console) + 12 MHz xtal + USB-C
+  - usb3         WCH CH569 HSPI<->USB3 SuperSpeed bridge + 30 MHz xtal + USB3 connector
+  - (later)      6502/65816 CPU-socket bus interface + 5V<->3.3V level shifting
+"""
+
+SomBtb = Module("modules/som_btb.zen")
+Power = Module("modules/power.zen")
+Sdram = Module("modules/sdram.zen")
+Programming = Module("modules/programming.zen")
+Usb3Bridge = Module("modules/usb3.zen")
+
+Board(
+    name="appletini-mega",
+    layout_path="layout",
+    layers=4,
+)
+
+SomBtb(name="SOM")
+Power(name="PWR")
+Sdram(name="SDRAM")
+Programming(name="PROG")
+Usb3Bridge(name="USB3")

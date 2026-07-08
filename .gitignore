@@ -1,0 +1,18 @@
+# pcb (Zener) local cache + build output
+.pcb/
+build/
+
+# KiCad backups / autosave
+*.bak
+*-bak
+*-backups
+*.kicad_pcb-bak
+*.kicad_prl
+_autosave-*
+fp-info-cache
+*.lck
+*.net
+*.dsn
+*.ses
+
+.DS_Store

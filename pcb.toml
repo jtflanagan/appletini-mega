@@ -1,0 +1,23 @@
+[workspace]
+repository = "github.com/jtflanagan/appletini-mega"
+pcb-version = "0.4"
+vendor = ["github.com/diodeinc/registry/**"]
+
+[board]
+name = "appletini-mega"
+path = "appletini_mega.zen"
+description = "Apple II/IIgs accelerator carrier board for a Sipeed Tang Mega 60K SOM (GW5AT-60)"
+
+[dependencies]
+"github.com/jtflanagan/appletini-mega/components/Alliance_Memory/AS4C16M16SA-7BCN" = "0.1.0"
+"github.com/jtflanagan/appletini-mega/components/FTDI/FT2232HQ-TRAY" = "0.1.0"
+"github.com/jtflanagan/appletini-mega/components/Fosan/AMS1117-3_3" = "0.1.0"
+"github.com/jtflanagan/appletini-mega/components/HRS_Hirose/DF40C-100DS-0_4V_51" = "0.1.0"
+"github.com/jtflanagan/appletini-mega/components/HRS_Hirose/DF40C-80DS-0_4V_51" = "0.1.0"
+"github.com/jtflanagan/appletini-mega/components/JLCPCB_Assembly/MP2315" = "0.1.0"
+"github.com/jtflanagan/appletini-mega/components/Korean_Hroparts_Elec/TYPE-C-31-M-12" = "0.1.0"
+"github.com/jtflanagan/appletini-mega/components/Microchip_Technology/93LC56_P" = "0.1.0"
+"github.com/jtflanagan/appletini-mega/components/WCH_Jiangsu_Qin_Heng/CH569W" = "0.1.0"
+
+[access]
+allow = ["*"]

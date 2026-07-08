@@ -1,0 +1,112 @@
+"""
+usb3 — WCH CH569 HSPI<->USB3 SuperSpeed bridge to the host (Raspberry Pi 5).
+
+CH569W: 32-bit HSPI (SDR) <-> FPGA;  USB3 SuperSpeed (5 Gbps) <-> host (~320 MB/s Pi5 wall).
+30 MHz crystal. Internal LDOs make the 1.2 V core rails (V12CORE/V12USB) from 3.3 V.
+USB-C port is DATA-ONLY. Per ch569/README: 90R diff SS, 100nF AC-couple on SS TX; skip
+orientation-flip for prototypes (one SS pair wired, plug correct way up); CC 5.1k Rd.
+
+UNWIRED to other modules this round: HSPI (PA*/PB*) + SS + rail nets are local labels.
+NOTE: USB-C = TYPE-C-31-M-12 (16-pin) PLACEHOLDER — it has NO SuperSpeed pins; swap for a
+full 24-pin USB-C receptacle (with SSTX/SSRX pairs) before layout. SS nets are parked local.
+"""
+
+Resistor  = Module("@stdlib/generics/Resistor.zen")
+Capacitor = Module("@stdlib/generics/Capacitor.zen")
+Crystal   = Module("@stdlib/generics/Crystal.zen")
+CH569     = Module("../components/WCH_Jiangsu_Qin_Heng/CH569W/CH569W.zen")
+USBC      = Module("../components/Korean_Hroparts_Elec/TYPE-C-31-M-12/TYPE-C-31-M-12.zen")
+
+GND  = Ground()
+P3V3 = Power("P3V3")
+P1V2 = Power("CH_1V2")   # CH569 internal-LDO core rail (V12CORE/V12USB)
+
+_XI = Net("CH_XI"); _XO = Net("CH_XO")
+_UDP = Net("USB_CH_DP"); _UDN = Net("USB_CH_DM")
+_CC1 = Net("CH_CC1"); _CC2 = Net("CH_CC2")
+_SSTXA = Net("CH_SSTXA"); _SSTXB = Net("CH_SSTXB")
+
+CH569(
+    name="U_CH",
+    PA0=Net("CH_PA0"),
+    PA1=Net("CH_PA1"),
+    PA2=Net("CH_PA2"),
+    PA3=Net("CH_PA3"),
+    PA4=Net("CH_PA4"),
+    PA5=Net("CH_PA5"),
+    PA6=Net("CH_PA6"),
+    PA7=Net("CH_PA7"),
+    PA8=Net("CH_PA8"),
+    PA9=Net("CH_PA9"),
+    PA10=Net("CH_PA10"),
+    PA11=Net("CH_PA11"),
+    PA12=Net("CH_PA12"),
+    PA13=Net("CH_PA13"),
+    PA14=Net("CH_PA14"),
+    PA15=Net("CH_PA15"),
+    PA16=Net("CH_PA16"),
+    PA17=Net("CH_PA17"),
+    PA18=Net("CH_PA18"),
+    PA19=Net("CH_PA19"),
+    PA20=Net("CH_PA20"),
+    PA21=Net("CH_PA21"),
+    PA22=Net("CH_PA22"),
+    PA23=Net("CH_PA23"),
+    PB0=Net("CH_PB0"),
+    PB1=Net("CH_PB1"),
+    PB2=Net("CH_PB2"),
+    PB3=Net("CH_PB3"),
+    PB4=Net("CH_PB4"),
+    PB5=Net("CH_PB5"),
+    PB6=Net("CH_PB6"),
+    PB7=Net("CH_PB7"),
+    PB8=Net("CH_PB8"),
+    PB9=Net("CH_PB9"),
+    PB10=Net("CH_PB10"),
+    PB11=Net("CH_PB11"),
+    PB12=Net("CH_PB12"),
+    PB13=Net("CH_PB13"),
+    PB14=Net("CH_PB14"),
+    PB15=Net("CH_PB15"),
+    PB16=Net("CH_PB16"),
+    PB17=Net("CH_PB17"),
+    PB18=Net("CH_PB18"),
+    PB19=Net("CH_PB19"),
+    PB20=Net("CH_PB20"),
+    PB21=Net("CH_PB21"),
+    PB22=Net("CH_PB22"),
+    PB23=Net("CH_PB23"),
+    PB24=Net("CH_PB24"),
+    UD_POS=_UDP, UD_NEG=_UDN,
+    SSTXA=_SSTXA, SSTXB=_SSTXB, SSRXA=Net("CH_SSRXA"), SSRXB=Net("CH_SSRXB"),
+    GXP=Net("CH_GXP"), GXM=Net("CH_GXM"),
+    XI=_XI, XO=_XO,
+    V33LDO=P3V3, V33USB=P3V3, V33GX=P3V3, VDDIO=P3V3,
+    V12CORE=P1V2, V12USB=P1V2,
+    GND=GND,
+)
+
+# core/IO decoupling
+Capacitor(name="C_CH_33_1", value="100nF", package="0402", P1=P3V3.NET, P2=GND.NET)
+Capacitor(name="C_CH_33_2", value="100nF", package="0402", P1=P3V3.NET, P2=GND.NET)
+Capacitor(name="C_CH_33_3", value="100nF", package="0402", P1=P3V3.NET, P2=GND.NET)
+Capacitor(name="C_CH_33_4", value="100nF", package="0402", P1=P3V3.NET, P2=GND.NET)
+Capacitor(name="C_CH_33b", value="4.7uF",  package="0603", P1=P3V3.NET, P2=GND.NET)
+Capacitor(name="C_CH_12_1", value="1uF", package="0402", P1=P1V2.NET, P2=GND.NET)
+Capacitor(name="C_CH_12_2", value="1uF", package="0402", P1=P1V2.NET, P2=GND.NET)
+
+# 30 MHz crystal
+Crystal  (name="Y_CH", package="3225_4Pin", frequency="30MHz", XIN=_XI, XOUT=_XO, GND=GND.NET)
+Capacitor(name="C_CH_X1", value="12pF", package="0402", P1=_XI, P2=GND.NET)
+Capacitor(name="C_CH_X2", value="12pF", package="0402", P1=_XO, P2=GND.NET)
+
+# USB3 SS TX AC-coupling (100nF), SS RX/pairs parked local (need 24-pin USB-C)
+Capacitor(name="C_SSTXA", value="100nF", package="0402", P1=_SSTXA, P2=Net("CH_SSTXA_C"))
+Capacitor(name="C_SSTXB", value="100nF", package="0402", P1=_SSTXB, P2=Net("CH_SSTXB_C"))
+
+# USB-C (data-only PLACEHOLDER; USB2 lines wired, SS not present on 16-pin part)
+USBC(name="J_USB_CH", VBUS=Net("CH_VBUS_SENSE"),
+     DP1=_UDP, DP2=_UDP, DN1=_UDN, DN2=_UDN,
+     CC1=_CC1, CC2=_CC2, SBU1=Net("CH_SBU1"), SBU2=Net("CH_SBU2"), GND=GND.NET, EH=GND.NET)
+Resistor(name="R_CH_CC1", value="5.1kohm", package="0402", P1=_CC1, P2=GND.NET)
+Resistor(name="R_CH_CC2", value="5.1kohm", package="0402", P1=_CC2, P2=GND.NET)

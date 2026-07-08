@@ -1,0 +1,56 @@
+"""
+power — 12 V barrel-jack input and the on-board rail tree.
+
+Topology (CARRIER_PLAN "Power delivery"):
+  DC barrel jack, 12 V  ->  MP2315 sync buck -> 5 V (VBUS_SOM + Apple-bus shifter 5V side)
+                        ->  AMS1117-3.3 LDO  -> 3.3 V (VCCIO / logic / CH569 + FT2232H IO)
+
+Both USB-C ports are DATA-ONLY; the barrel jack is the sole power input.
+
+UNWIRED to other modules this round: rails are local nets here (P12V/P5V/P3V3) and get
+tied to the SOM/IC modules when we wire. Passive values are sensible starting points.
+
+TODO(parts): barrel-jack MPN is a PinHeader(1x3) PLACEHOLDER — the LCSC "POWER-JACK" model
+wouldn't fetch; swap for the real DC jack (12V, 2.1/5.5mm) before layout. Add reverse-polarity
+P-FET + fuse for full input protection (TVS is placed).
+"""
+
+Resistor  = Module("@stdlib/generics/Resistor.zen")
+Capacitor = Module("@stdlib/generics/Capacitor.zen")
+Inductor  = Module("@stdlib/generics/Inductor.zen")
+Tvs       = Module("@stdlib/generics/Tvs.zen")
+PinHeader = Module("@stdlib/generics/PinHeader.zen")
+MP2315    = Module("../components/JLCPCB_Assembly/MP2315/MP2315.zen")
+AMS1117   = Module("../components/Fosan/AMS1117-3_3/AMS1117-3_3.zen")
+
+GND  = Ground()
+P12V = Power("P12V")
+P5V  = Power("P5V")
+P3V3 = Power("P3V3")
+
+# ---- input: barrel jack (PLACEHOLDER footprint) + protection ----
+PinHeader(name="J_PWR", pins=3, rows=1, mount="THT", pitch="2.54mm",
+          P1=P12V.NET, P2=GND.NET, P3=GND.NET)   # tip=+12V, sleeve/switch=GND
+Tvs(name="D_IN", package="DO-214AA", K=P12V.NET, A=GND)         # SMB input clamp
+Capacitor(name="C_IN1", value="10uF",  package="1206", P1=P12V.NET, P2=GND.NET)
+Capacitor(name="C_IN2", value="10uF",  package="1206", P1=P12V.NET, P2=GND.NET)
+
+# ---- 12V -> 5V : MP2315 synchronous buck ----
+_SW  = Net("PWR_SW")
+_BST = Net("PWR_BST")
+_FB5 = Net("PWR_FB5")
+_VCC = Net("PWR_VCC")
+_AAM = Net("PWR_AAM")
+MP2315(name="U_BUCK", IN=P12V, SW=_SW, GND=GND, FB=_FB5, EN=P12V, BST=_BST, VCC=_VCC, AAM=_AAM)
+Inductor (name="L_BUCK", value="2.2uH", package="1210", P1=_SW,      P2=P5V.NET)
+Capacitor(name="C_BST",  value="100nF", package="0402", P1=_SW,      P2=_BST)
+Capacitor(name="C_VCC",  value="1uF",   package="0402", P1=_VCC,     P2=GND.NET)
+Resistor (name="R_FB1",  value="52.3kohm", package="0402", P1=P5V.NET, P2=_FB5)   # 5V from 0.8V ref
+Resistor (name="R_FB2",  value="10kohm",   package="0402", P1=_FB5,    P2=GND.NET)
+Capacitor(name="C_O5A",  value="22uF",  package="0805", P1=P5V.NET,  P2=GND.NET)
+Capacitor(name="C_O5B",  value="22uF",  package="0805", P1=P5V.NET,  P2=GND.NET)
+
+# ---- 5V -> 3.3V : AMS1117-3.3 LDO ----
+AMS1117(name="U_LDO", VIN=P5V, VOUT=P3V3, VSS=GND)
+Capacitor(name="C_LDO_I", value="10uF", package="0805", P1=P5V.NET,  P2=GND.NET)
+Capacitor(name="C_LDO_O", value="22uF", package="0805", P1=P3V3.NET, P2=GND.NET)

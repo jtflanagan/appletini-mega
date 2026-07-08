@@ -1,0 +1,15 @@
+"""
+AMS1117-3_3
+
+Auto-generated using `pcb search`.
+"""
+
+VIN = io(Net)
+VOUT = io(Net)
+VSS = io(Net)
+
+Component(
+    name="AMS1117-3_3",
+    symbol=Symbol(library="AMS1117-3_3.kicad_sym"),
+    pins={"VIN": VIN, "VOUT": VOUT, "VSS": VSS},
+)

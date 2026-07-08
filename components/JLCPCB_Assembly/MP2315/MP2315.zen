@@ -1,0 +1,20 @@
+"""
+MP2315
+
+Auto-generated using `pcb search`.
+"""
+
+AAM = io(Net)
+BST = io(Net)
+EN = io(Net)
+FB = io(Net)
+GND = io(Net)
+IN = io(Net)
+SW = io(Net)
+VCC = io(Net)
+
+Component(
+    name="MP2315",
+    symbol=Symbol(library="MP2315.kicad_sym"),
+    pins={"AAM": AAM, "BST": BST, "EN": EN, "FB": FB, "GND": GND, "IN": IN, "SW": SW, "VCC": VCC},
+)

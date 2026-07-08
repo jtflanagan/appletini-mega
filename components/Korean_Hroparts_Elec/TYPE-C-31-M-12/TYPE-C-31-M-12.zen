@@ -1,0 +1,35 @@
+"""
+TYPE-C-31-M-12
+
+Auto-generated using `pcb search`.
+"""
+
+CC1 = io(Net)
+CC2 = io(Net)
+DN1 = io(Net)
+DN2 = io(Net)
+DP1 = io(Net)
+DP2 = io(Net)
+EH = io(Net)
+GND = io(Net)
+SBU1 = io(Net)
+SBU2 = io(Net)
+VBUS = io(Net)
+
+Component(
+    name="TYPE-C-31-M-12",
+    symbol=Symbol(library="TYPE-C-31-M-12.kicad_sym"),
+    pins={
+        "CC1": CC1,
+        "CC2": CC2,
+        "DN1": DN1,
+        "DN2": DN2,
+        "DP1": DP1,
+        "DP2": DP2,
+        "EH": EH,
+        "GND": GND,
+        "SBU1": SBU1,
+        "SBU2": SBU2,
+        "VBUS": VBUS,
+    },
+)

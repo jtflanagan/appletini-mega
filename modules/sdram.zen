@@ -1,0 +1,122 @@
+"""
+sdram — 32-bit-wide SDR SDRAM (soft-CPU FETCH path), two INDEPENDENT 16-bit devices.
+
+Two AS4C16M16SA (256Mbit, 16Mx16, TSOP-54) SDR SDRAMs. This is the committed part: a
+JEDEC-standard 256Mbit x16 SDR SDRAM, LCSC-stocked with a verified ECAD model — chosen over
+the originally-planned Winbond W9825G6KH (JEDEC-identical, but no LCSC model) for exactly that
+reason. Each device is wired as its OWN point-to-point bus (independent address/BA/command/
+clock) rather than a shared bus: the two 16-bit halves land on separate DF40 connectors
+(C2399 BANK1/2 vs C2400 BANK6/7/8), so independent routing keeps each bus bank-local and
+point-to-point (see CARRIER_PLAN + the routing discussion). Data forms the 32-bit word:
+U_LO=DQ[15:0], U_HI=DQ[31:16].
+
+UNWIRED this round: pins carry per-device local nets (labels); FPGA wiring comes later.
+"""
+
+SDRAM = Module("../components/Alliance_Memory/AS4C16M16SA-7BCN/AS4C16M16SA-7BCN.zen")
+Capacitor = Module("@stdlib/generics/Capacitor.zen")
+
+VDD = Power("SDRAM_VDD_3V3")   # 3.3V rail (from power module; unwired here)
+GND = Ground()
+
+# ===== U_LO — low 16 bits, DQ[15:0]  (independent bus A) =====
+SDRAM(
+    name="ULO",
+    A0=Net("SDRAM_ULO_A0"),
+    A1=Net("SDRAM_ULO_A1"),
+    A2=Net("SDRAM_ULO_A2"),
+    A3=Net("SDRAM_ULO_A3"),
+    A4=Net("SDRAM_ULO_A4"),
+    A5=Net("SDRAM_ULO_A5"),
+    A6=Net("SDRAM_ULO_A6"),
+    A7=Net("SDRAM_ULO_A7"),
+    A8=Net("SDRAM_ULO_A8"),
+    A9=Net("SDRAM_ULO_A9"),
+    A10=Net("SDRAM_ULO_A10"),
+    A11=Net("SDRAM_ULO_A11"),
+    A12=Net("SDRAM_ULO_A12"),
+    BA0=Net("SDRAM_ULO_BA0"),
+    BA1=Net("SDRAM_ULO_BA1"),
+    CLK=Net("SDRAM_ULO_CLK"),
+    CKE=Net("SDRAM_ULO_CKE"),
+    N_CS=Net("SDRAM_ULO_N_CS"),
+    N_RAS=Net("SDRAM_ULO_N_RAS"),
+    N_CAS=Net("SDRAM_ULO_N_CAS"),
+    N_WE=Net("SDRAM_ULO_N_WE"),
+    LDQM=Net("SDRAM_ULO_LDQM"),
+    UDQM=Net("SDRAM_ULO_UDQM"),
+    DQ0=Net("SDRAM_DQ0"),
+    DQ1=Net("SDRAM_DQ1"),
+    DQ2=Net("SDRAM_DQ2"),
+    DQ3=Net("SDRAM_DQ3"),
+    DQ4=Net("SDRAM_DQ4"),
+    DQ5=Net("SDRAM_DQ5"),
+    DQ6=Net("SDRAM_DQ6"),
+    DQ7=Net("SDRAM_DQ7"),
+    DQ8=Net("SDRAM_DQ8"),
+    DQ9=Net("SDRAM_DQ9"),
+    DQ10=Net("SDRAM_DQ10"),
+    DQ11=Net("SDRAM_DQ11"),
+    DQ12=Net("SDRAM_DQ12"),
+    DQ13=Net("SDRAM_DQ13"),
+    DQ14=Net("SDRAM_DQ14"),
+    DQ15=Net("SDRAM_DQ15"),
+    VDD=VDD, VDDQ=VDD,
+    VSS=GND, VSSQ=GND,
+    NC=Net("SDRAM_ULO_NC"),
+)
+Capacitor(name="C_ULO_1", value="100nF", package="0402", P1=VDD.NET, P2=GND.NET)
+Capacitor(name="C_ULO_2", value="100nF", package="0402", P1=VDD.NET, P2=GND.NET)
+Capacitor(name="C_ULO_3", value="100nF", package="0402", P1=VDD.NET, P2=GND.NET)
+Capacitor(name="C_ULO_4", value="100nF", package="0402", P1=VDD.NET, P2=GND.NET)
+
+# ===== U_HI — high 16 bits, DQ[31:16] (independent bus B) =====
+SDRAM(
+    name="UHI",
+    A0=Net("SDRAM_UHI_A0"),
+    A1=Net("SDRAM_UHI_A1"),
+    A2=Net("SDRAM_UHI_A2"),
+    A3=Net("SDRAM_UHI_A3"),
+    A4=Net("SDRAM_UHI_A4"),
+    A5=Net("SDRAM_UHI_A5"),
+    A6=Net("SDRAM_UHI_A6"),
+    A7=Net("SDRAM_UHI_A7"),
+    A8=Net("SDRAM_UHI_A8"),
+    A9=Net("SDRAM_UHI_A9"),
+    A10=Net("SDRAM_UHI_A10"),
+    A11=Net("SDRAM_UHI_A11"),
+    A12=Net("SDRAM_UHI_A12"),
+    BA0=Net("SDRAM_UHI_BA0"),
+    BA1=Net("SDRAM_UHI_BA1"),
+    CLK=Net("SDRAM_UHI_CLK"),
+    CKE=Net("SDRAM_UHI_CKE"),
+    N_CS=Net("SDRAM_UHI_N_CS"),
+    N_RAS=Net("SDRAM_UHI_N_RAS"),
+    N_CAS=Net("SDRAM_UHI_N_CAS"),
+    N_WE=Net("SDRAM_UHI_N_WE"),
+    LDQM=Net("SDRAM_UHI_LDQM"),
+    UDQM=Net("SDRAM_UHI_UDQM"),
+    DQ0=Net("SDRAM_DQ16"),
+    DQ1=Net("SDRAM_DQ17"),
+    DQ2=Net("SDRAM_DQ18"),
+    DQ3=Net("SDRAM_DQ19"),
+    DQ4=Net("SDRAM_DQ20"),
+    DQ5=Net("SDRAM_DQ21"),
+    DQ6=Net("SDRAM_DQ22"),
+    DQ7=Net("SDRAM_DQ23"),
+    DQ8=Net("SDRAM_DQ24"),
+    DQ9=Net("SDRAM_DQ25"),
+    DQ10=Net("SDRAM_DQ26"),
+    DQ11=Net("SDRAM_DQ27"),
+    DQ12=Net("SDRAM_DQ28"),
+    DQ13=Net("SDRAM_DQ29"),
+    DQ14=Net("SDRAM_DQ30"),
+    DQ15=Net("SDRAM_DQ31"),
+    VDD=VDD, VDDQ=VDD,
+    VSS=GND, VSSQ=GND,
+    NC=Net("SDRAM_UHI_NC"),
+)
+Capacitor(name="C_UHI_1", value="100nF", package="0402", P1=VDD.NET, P2=GND.NET)
+Capacitor(name="C_UHI_2", value="100nF", package="0402", P1=VDD.NET, P2=GND.NET)
+Capacitor(name="C_UHI_3", value="100nF", package="0402", P1=VDD.NET, P2=GND.NET)
+Capacitor(name="C_UHI_4", value="100nF", package="0402", P1=VDD.NET, P2=GND.NET)

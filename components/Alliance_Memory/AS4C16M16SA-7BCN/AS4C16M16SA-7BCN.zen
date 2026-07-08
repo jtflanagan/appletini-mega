@@ -1,0 +1,101 @@
+"""
+AS4C16M16SA-7BCN
+
+Auto-generated using `pcb search`.
+"""
+
+A0 = io(Net)
+A1 = io(Net)
+A10 = io(Net)
+A11 = io(Net)
+A12 = io(Net)
+A2 = io(Net)
+A3 = io(Net)
+A4 = io(Net)
+A5 = io(Net)
+A6 = io(Net)
+A7 = io(Net)
+A8 = io(Net)
+A9 = io(Net)
+BA0 = io(Net)
+BA1 = io(Net)
+CKE = io(Net)
+CLK = io(Net)
+DQ0 = io(Net)
+DQ1 = io(Net)
+DQ10 = io(Net)
+DQ11 = io(Net)
+DQ12 = io(Net)
+DQ13 = io(Net)
+DQ14 = io(Net)
+DQ15 = io(Net)
+DQ2 = io(Net)
+DQ3 = io(Net)
+DQ4 = io(Net)
+DQ5 = io(Net)
+DQ6 = io(Net)
+DQ7 = io(Net)
+DQ8 = io(Net)
+DQ9 = io(Net)
+LDQM = io(Net)
+NC = io(Net)
+N_CAS = io(Net)
+N_CS = io(Net)
+N_RAS = io(Net)
+N_WE = io(Net)
+UDQM = io(Net)
+VDD = io(Net)
+VDDQ = io(Net)
+VSS = io(Net)
+VSSQ = io(Net)
+
+Component(
+    name="AS4C16M16SA-7BCN",
+    symbol=Symbol(library="AS4C16M16SA-7BCN.kicad_sym"),
+    pins={
+        "A0": A0,
+        "A1": A1,
+        "A10": A10,
+        "A11": A11,
+        "A12": A12,
+        "A2": A2,
+        "A3": A3,
+        "A4": A4,
+        "A5": A5,
+        "A6": A6,
+        "A7": A7,
+        "A8": A8,
+        "A9": A9,
+        "BA0": BA0,
+        "BA1": BA1,
+        "CKE": CKE,
+        "CLK": CLK,
+        "DQ0": DQ0,
+        "DQ1": DQ1,
+        "DQ10": DQ10,
+        "DQ11": DQ11,
+        "DQ12": DQ12,
+        "DQ13": DQ13,
+        "DQ14": DQ14,
+        "DQ15": DQ15,
+        "DQ2": DQ2,
+        "DQ3": DQ3,
+        "DQ4": DQ4,
+        "DQ5": DQ5,
+        "DQ6": DQ6,
+        "DQ7": DQ7,
+        "DQ8": DQ8,
+        "DQ9": DQ9,
+        "LDQM": LDQM,
+        "NC": NC,
+        "UDQM": UDQM,
+        "VDD": VDD,
+        "VDDQ": VDDQ,
+        "VSS": VSS,
+        "VSSQ": VSSQ,
+        "~{CAS}": N_CAS,
+        "~{CS}": N_CS,
+        "~{RAS}": N_RAS,
+        "~{WE}": N_WE,
+    },
+)
