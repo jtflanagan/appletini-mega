@@ -3,19 +3,20 @@ usb3 — WCH CH569 HSPI<->USB3 SuperSpeed bridge to the host (Raspberry Pi 5).
 
 CH569W: 32-bit HSPI (SDR) <-> FPGA;  USB3 SuperSpeed (5 Gbps) <-> host (~320 MB/s Pi5 wall).
 30 MHz crystal. Internal LDOs make the 1.2 V core rails (V12CORE/V12USB) from 3.3 V.
-USB-C port is DATA-ONLY. Per ch569/README: 90R diff SS, 100nF AC-couple on SS TX; skip
-orientation-flip for prototypes (one SS pair wired, plug correct way up); CC 5.1k Rd.
 
-UNWIRED to other modules this round: HSPI (PA*/PB*) + SS + rail nets are local labels.
-NOTE: USB-C = TYPE-C-31-M-12 (16-pin) PLACEHOLDER — it has NO SuperSpeed pins; swap for a
-full 24-pin USB-C receptacle (with SSTX/SSRX pairs) before layout. SS nets are parked local.
+USB-C = type-c24p (full 24-pin, DATA-ONLY). USB2 on D+/D-. ONE SuperSpeed pair wired:
+CH569 SSTX -> 100nF AC-couple -> TX1; host RX1 -> CH569 SSRX. TX2/RX2 left NC = no
+orientation-flip (plug correct way up for USB3; USB2 works either way). CC1/CC2 = 5.1k Rd,
+VBUS sensed not drawn (per ch569/README + the CC discussion).
+
+UNWIRED to other modules this round: HSPI (PA*/PB*) + rail nets are local labels.
 """
 
 Resistor  = Module("@stdlib/generics/Resistor.zen")
 Capacitor = Module("@stdlib/generics/Capacitor.zen")
 Crystal   = Module("@stdlib/generics/Crystal.zen")
 CH569     = Module("../components/WCH_Jiangsu_Qin_Heng/CH569W/CH569W.zen")
-USBC      = Module("../components/Korean_Hroparts_Elec/TYPE-C-31-M-12/TYPE-C-31-M-12.zen")
+USBC      = Module("../components/JLCPCB_Assembly/type-c24p/type-c24p.zen")
 
 GND  = Ground()
 P3V3 = Power("P3V3")
@@ -24,7 +25,9 @@ P1V2 = Power("CH_1V2")   # CH569 internal-LDO core rail (V12CORE/V12USB)
 _XI = Net("CH_XI"); _XO = Net("CH_XO")
 _UDP = Net("USB_CH_DP"); _UDN = Net("USB_CH_DM")
 _CC1 = Net("CH_CC1"); _CC2 = Net("CH_CC2")
-_SSTXA = Net("CH_SSTXA"); _SSTXB = Net("CH_SSTXB")
+_SSTXA = Net("CH_SSTXP"); _SSTXB = Net("CH_SSTXN")   # CH569 SS TX pair (pre AC-couple)
+_SSRXA = Net("CH_SSRXP"); _SSRXB = Net("CH_SSRXN")   # CH569 SS RX pair
+_TX1P = Net("USB_TX1_P"); _TX1N = Net("USB_TX1_N")   # AC-coupled SS TX to USB-C
 
 CH569(
     name="U_CH",
@@ -78,7 +81,7 @@ CH569(
     PB23=Net("CH_PB23"),
     PB24=Net("CH_PB24"),
     UD_POS=_UDP, UD_NEG=_UDN,
-    SSTXA=_SSTXA, SSTXB=_SSTXB, SSRXA=Net("CH_SSRXA"), SSRXB=Net("CH_SSRXB"),
+    SSTXA=_SSTXA, SSTXB=_SSTXB, SSRXA=_SSRXA, SSRXB=_SSRXB,
     GXP=Net("CH_GXP"), GXM=Net("CH_GXM"),
     XI=_XI, XO=_XO,
     V33LDO=P3V3, V33USB=P3V3, V33GX=P3V3, VDDIO=P3V3,
@@ -100,13 +103,17 @@ Crystal  (name="Y_CH", package="3225_4Pin", frequency="30MHz", XIN=_XI, XOUT=_XO
 Capacitor(name="C_CH_X1", value="12pF", package="0402", P1=_XI, P2=GND.NET)
 Capacitor(name="C_CH_X2", value="12pF", package="0402", P1=_XO, P2=GND.NET)
 
-# USB3 SS TX AC-coupling (100nF), SS RX/pairs parked local (need 24-pin USB-C)
-Capacitor(name="C_SSTXA", value="100nF", package="0402", P1=_SSTXA, P2=Net("CH_SSTXA_C"))
-Capacitor(name="C_SSTXB", value="100nF", package="0402", P1=_SSTXB, P2=Net("CH_SSTXB_C"))
+# SS TX AC-coupling (100nF) CH569 -> USB-C TX1
+Capacitor(name="C_SSTXP", value="100nF", package="0201", P1=_SSTXA, P2=_TX1P)
+Capacitor(name="C_SSTXN", value="100nF", package="0201", P1=_SSTXB, P2=_TX1N)
 
-# USB-C (data-only PLACEHOLDER; USB2 lines wired, SS not present on 16-pin part)
-USBC(name="J_USB_CH", VBUS=Net("CH_VBUS_SENSE"),
-     DP1=_UDP, DP2=_UDP, DN1=_UDN, DN2=_UDN,
-     CC1=_CC1, CC2=_CC2, SBU1=Net("CH_SBU1"), SBU2=Net("CH_SBU2"), GND=GND.NET, EH=GND.NET)
+# USB-C 24-pin (data-only): USB2 on D+/D-, SS pair 1 wired, pair 2 NC (no flip)
+USBC(name="J_USB_CH",
+     D_POS=_UDP, D_NEG=_UDN,
+     TX1_POS=_TX1P, TX1_NEG=_TX1N, RX1_POS=_SSRXA, RX1_NEG=_SSRXB,
+     TX2_POS=Net("CH_TX2P_NC"), TX2_NEG=Net("CH_TX2N_NC"),
+     RX2_POS=Net("CH_RX2P_NC"), RX2_NEG=Net("CH_RX2N_NC"),
+     CC1=_CC1, CC2=_CC2, SUB1=Net("CH_SBU1"), SUB2=Net("CH_SBU2"),
+     VBUS=Net("CH_VBUS_SENSE"), GND=GND.NET, P25=GND.NET, P3=GND.NET, P4=GND.NET)
 Resistor(name="R_CH_CC1", value="5.1kohm", package="0402", P1=_CC1, P2=GND.NET)
 Resistor(name="R_CH_CC2", value="5.1kohm", package="0402", P1=_CC2, P2=GND.NET)

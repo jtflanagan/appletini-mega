@@ -1,0 +1,20 @@
+"""
+TYPE-C-31-M-16
+
+Auto-generated using `pcb search`.
+"""
+
+CC1 = io(Net)
+CC2 = io(Net)
+GND = io(Net)
+P1 = io(Net)
+P2 = io(Net)
+P3 = io(Net)
+P4 = io(Net)
+VBUS = io(Net)
+
+Component(
+    name="TYPE-C-31-M-16",
+    symbol=Symbol(library="TYPE-C-31-M-16.kicad_sym"),
+    pins={"1": P1, "2": P2, "3": P3, "4": P4, "CC1": CC1, "CC2": CC2, "GND": GND, "VBUS": VBUS},
+)

@@ -1,0 +1,51 @@
+"""
+type-c24p
+
+Auto-generated using `pcb search`.
+"""
+
+CC1 = io(Net)
+CC2 = io(Net)
+D_NEG = io(Net)
+D_POS = io(Net)
+GND = io(Net)
+P25 = io(Net)
+P3 = io(Net)
+P4 = io(Net)
+RX1_NEG = io(Net)
+RX1_POS = io(Net)
+RX2_NEG = io(Net)
+RX2_POS = io(Net)
+SUB1 = io(Net)
+SUB2 = io(Net)
+TX1_NEG = io(Net)
+TX1_POS = io(Net)
+TX2_NEG = io(Net)
+TX2_POS = io(Net)
+VBUS = io(Net)
+
+Component(
+    name="type-c24p",
+    symbol=Symbol(library="type-c24p.kicad_sym"),
+    pins={
+        "25": P25,
+        "3": P3,
+        "4": P4,
+        "CC1": CC1,
+        "CC2": CC2,
+        "D+": D_POS,
+        "D-": D_NEG,
+        "GND": GND,
+        "RX1+": RX1_POS,
+        "RX1-": RX1_NEG,
+        "RX2+": RX2_POS,
+        "RX2-": RX2_NEG,
+        "SUB1": SUB1,
+        "SUB2": SUB2,
+        "TX1+": TX1_POS,
+        "TX1-": TX1_NEG,
+        "TX2+": TX2_POS,
+        "TX2-": TX2_NEG,
+        "VBUS": VBUS,
+    },
+)
