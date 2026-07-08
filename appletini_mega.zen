@@ -23,7 +23,7 @@ Usb3Bridge = Module("modules/usb3.zen")
 Board(
     name="appletini-mega",
     layout_path="layout",
-    layers=4,
+    layers=6,  # dense 0.4mm DF40 escape (3 conns) + two 32-bit buses + USB3 SS; 4 layers too tight
 )
 
 SomBtb(name="SOM")
