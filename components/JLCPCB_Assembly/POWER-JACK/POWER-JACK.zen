@@ -1,0 +1,15 @@
+"""
+POWER-JACK
+
+Auto-generated using `pcb search`.
+"""
+
+P1 = io(Net)
+P2 = io(Net)
+P3 = io(Net)
+
+Component(
+    name="POWER-JACK",
+    symbol=Symbol(library="POWER-JACK.kicad_sym"),
+    pins={"1": P1, "2": P2, "3": P3},
+)
