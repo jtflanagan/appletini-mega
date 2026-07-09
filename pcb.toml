@@ -10,6 +10,7 @@ description = "Apple II/IIgs accelerator carrier board for a Sipeed Tang Mega 60
 
 [dependencies]
 "github.com/jtflanagan/appletini-mega/components/Alliance_Memory/AS4C16M16SA-7BCN" = "0.1.0"
+"github.com/jtflanagan/appletini-mega/components/AppleII/AppleIIBus_Edge" = "0.1.0"
 "github.com/jtflanagan/appletini-mega/components/Bourns_Inc/MF-MSMF110-2" = "0.1.0"
 "github.com/jtflanagan/appletini-mega/components/ElecSuper/AO3401A" = "0.1.0"
 "github.com/jtflanagan/appletini-mega/components/FTDI/FT2232HQ-TRAY" = "0.1.0"

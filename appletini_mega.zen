@@ -20,6 +20,7 @@ Sdram = Module("modules/sdram.zen")
 Programming = Module("modules/programming.zen")
 Usb3Bridge = Module("modules/usb3.zen")
 CpuSocket = Module("modules/cpu_socket.zen")
+Mechanical = Module("modules/mechanical.zen")
 
 Board(
     name="appletini-mega",
@@ -33,3 +34,4 @@ Sdram(name="SDRAM")
 Programming(name="PROG")
 Usb3Bridge(name="USB3")
 CpuSocket(name="CPU")
+Mechanical(name="MECH")

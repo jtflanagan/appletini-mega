@@ -26,6 +26,12 @@ The Windows paths are `C:/repos/tang_mega_138k_dock` and `C:/repos/sipeed_wiki`.
 which are LZString-compressed; decompress in pure Python) cross-checked against the mechanical drawing.
 Needed for physical layout of the carrier's mating side.
 
+**Board floorplan / placement** (do this BEFORE assigning banks/balls): `docs/board_floorplan.md` —
+the carrier is an **Apple II/IIgs peripheral-slot card** (slot = mechanical mount; CPU bus taken at
+the CPU socket via ribbon). Captures the card mechanicals, the two-ground-path/grounding decision,
+block placement affinities, and open questions. Sequence is floorplan → bank assignment → ball
+assignment → route.
+
 **CPU socket connector** (the 5V Apple-bus side): `docs/cpu_socket_pinout.md` — full 40-pin DIP
 pinouts for the NMOS 6502, W65C02S, and W65C816S side by side (they share one DIP-40 socket; CMOS
 parts redefine the NMOS NC/VSS pins). Interface = 2×20 0.1″ header on carrier → ribbon → DIP-40 plug

@@ -1,0 +1,119 @@
+"""
+AppleIIBus_Edge — Apple II 50-pin peripheral-slot card edge (25 fingers x 2 sides, 0.1").
+
+Full, canonical //e slot pinout on the symbol so this can be lifted into another project and
+used as a REAL slot connector. Model-specific pins: 19 SYNC (slot-7 only), 35 COLORREF (=M2B0 on
+IIgs), 39 USER1 (=65C02 SYNC / M2SEL on IIgs).
+
+In THIS project the slot is MECHANICAL ONLY (single-star-point grounding is at the CPU socket),
+so every finger is an optional pin left UNCONNECTED (floating gold). Footprint carries
+exclude_from_bom / exclude_from_pos. Outline + footprint lifted from the prior AppleTini board.
+"""
+
+p1 = io(Net, optional=True)
+p2 = io(Net, optional=True)
+p3 = io(Net, optional=True)
+p4 = io(Net, optional=True)
+p5 = io(Net, optional=True)
+p6 = io(Net, optional=True)
+p7 = io(Net, optional=True)
+p8 = io(Net, optional=True)
+p9 = io(Net, optional=True)
+p10 = io(Net, optional=True)
+p11 = io(Net, optional=True)
+p12 = io(Net, optional=True)
+p13 = io(Net, optional=True)
+p14 = io(Net, optional=True)
+p15 = io(Net, optional=True)
+p16 = io(Net, optional=True)
+p17 = io(Net, optional=True)
+p18 = io(Net, optional=True)
+p19 = io(Net, optional=True)
+p20 = io(Net, optional=True)
+p21 = io(Net, optional=True)
+p22 = io(Net, optional=True)
+p23 = io(Net, optional=True)
+p24 = io(Net, optional=True)
+p25 = io(Net, optional=True)
+p26 = io(Net, optional=True)
+p27 = io(Net, optional=True)
+p28 = io(Net, optional=True)
+p29 = io(Net, optional=True)
+p30 = io(Net, optional=True)
+p31 = io(Net, optional=True)
+p32 = io(Net, optional=True)
+p33 = io(Net, optional=True)
+p34 = io(Net, optional=True)
+p35 = io(Net, optional=True)
+p36 = io(Net, optional=True)
+p37 = io(Net, optional=True)
+p38 = io(Net, optional=True)
+p39 = io(Net, optional=True)
+p40 = io(Net, optional=True)
+p41 = io(Net, optional=True)
+p42 = io(Net, optional=True)
+p43 = io(Net, optional=True)
+p44 = io(Net, optional=True)
+p45 = io(Net, optional=True)
+p46 = io(Net, optional=True)
+p47 = io(Net, optional=True)
+p48 = io(Net, optional=True)
+p49 = io(Net, optional=True)
+p50 = io(Net, optional=True)
+
+Component(
+    name="AppleIIBus_Edge",
+    symbol=Symbol(library="AppleIIBus_Edge.kicad_sym"),
+    pins={
+        "~{IOSEL}": p1,
+        "A0": p2,
+        "A1": p3,
+        "A2": p4,
+        "A3": p5,
+        "A4": p6,
+        "A5": p7,
+        "A6": p8,
+        "A7": p9,
+        "A8": p10,
+        "A9": p11,
+        "A10": p12,
+        "A11": p13,
+        "A12": p14,
+        "A13": p15,
+        "A14": p16,
+        "A15": p17,
+        "R/~{W}": p18,
+        "SYNC": p19,
+        "~{IOSTRB}": p20,
+        "~{RDY}": p21,
+        "~{DMA}": p22,
+        "~{INTOUT}": p23,
+        "~{DMAOUT}": p24,
+        "+5V": p25,
+        "GND": p26,
+        "~{DMAIN}": p27,
+        "~{INTIN}": p28,
+        "~{NMI}": p29,
+        "~{IRQ}": p30,
+        "~{RES}": p31,
+        "~{INH}": p32,
+        "-12V": p33,
+        "-5V": p34,
+        "COLORREF": p35,
+        "7M": p36,
+        "Q3": p37,
+        "PHI1": p38,
+        "USER1": p39,
+        "PHI0": p40,
+        "~{DEVSEL}": p41,
+        "D7": p42,
+        "D6": p43,
+        "D5": p44,
+        "D4": p45,
+        "D3": p46,
+        "D2": p47,
+        "D1": p48,
+        "D0": p49,
+        "+12V": p50,
+    },
+)

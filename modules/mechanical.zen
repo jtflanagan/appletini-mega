@@ -1,0 +1,14 @@
+"""
+mechanical — board mechanical items not part of any electrical subsystem.
+
+Currently just the Apple II peripheral-slot card edge (J_SLOT). MECHANICAL ONLY: the slot secures
+the card in the case; the CPU bus is taken at the CPU socket (see cpu_socket.zen). Per the
+single-star-point grounding decision (docs/board_floorplan.md), the 50 fingers are left
+UNCONNECTED (floating gold) — every pin on the component is optional and omitted here.
+
+(Mounting holes get added once the 6.0" x 2.75" outline is drawn.)
+"""
+
+AppleIISlot = Module("../components/AppleII/AppleIIBus_Edge/AppleIIBus_Edge.zen")
+
+AppleIISlot(name="J_SLOT")   # all 50 fingers optional -> unconnected (mechanical)
