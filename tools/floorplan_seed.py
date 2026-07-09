@@ -75,6 +75,33 @@ def fp_ref(blk):
     return m.group(1) if m else None
 
 
+def translate_zone_pts(blk, dx, dy):
+    """Translate every (xy x y) inside this footprint's (zone ...) blocks by (dx,dy).
+    KiCad footprint zones use absolute board coords (unlike pads/graphics, which are
+    footprint-relative), so they must move explicitly when the footprint is moved."""
+    def shift_xy(s):
+        return re.sub(r'\(xy (-?\d[\d.]*) (-?\d[\d.]*)\)',
+                      lambda p: f"(xy {float(p.group(1)) + dx:.6g} {float(p.group(2)) + dy:.6g})", s)
+    out, i = [], 0
+    while True:
+        j = blk.find("(zone", i)
+        if j < 0:
+            out.append(blk[i:]); break
+        out.append(blk[i:j])
+        d, k = 0, j
+        while k < len(blk):
+            if blk[k] == "(":
+                d += 1
+            elif blk[k] == ")":
+                d -= 1
+                if d == 0:
+                    break
+            k += 1
+        out.append(shift_xy(blk[j:k + 1]))
+        i = k + 1
+    return "".join(out)
+
+
 def fp_rot(blk):
     m = re.search(r'\(at\s+-?\d[\d.]*\s+-?\d[\d.]*\s+(-?\d[\d.]*)\)', blk)
     return float(m.group(1)) if m else 0.0
@@ -221,6 +248,12 @@ def run(move=True):
                 val = place[ref]
                 x, y = val[0], val[1]
                 rot = val[2] if len(val) > 2 else None
+                # Footprint zones (keepouts) store ABSOLUTE board coords, so a plain
+                # (at) edit leaves them behind. Translate every zone xy by the move delta.
+                om = re.search(r'\(at (-?\d[\d.]*) (-?\d[\d.]*)', blk)
+                dx, dy = x - float(om.group(1)), y - float(om.group(2))
+                if dx or dy:
+                    blk = translate_zone_pts(blk, dx, dy)
                 def repl(m, x=x, y=y, rot=rot):
                     tail = f" {rot}" if rot is not None else m.group(3)
                     return f"(at {x:.3f} {y:.3f}{tail})"
