@@ -193,3 +193,30 @@ through-vias suffice (the 3.2 mm inter-row gap suggests maybe) — that via deci
 - **Thermal watch:** the AMS1117 drops 5→3.3 V (≈1.7 V × I₃ᵥ₃); if the 3.3 V rail (VCCIO of the fast buses
   + CH569 + FT2232) approaches ~0.5–1 A that's ~1–2 W in a SOT-223 — give it copper pour, and consider a
   switching 3.3 V reg if the load is high. Budget the 3.3 V current before committing the LDO.
+
+## Connector pin-1 / footprint handedness — RESOLVED (2026-07-08)
+
+Placing the three DF40 receptacles, a **pad-numbering bug** surfaced in the imported
+**100-pin footprint** (`components/HRS_Hirose/DF40C-100DS-0_4V_51`). The DF40 receptacle is
+**NOT polarized** (Hirose datasheet Note 4) — it is mechanically symmetric, so pin 1 is purely a
+numbering convention and a mirror-flipped import is silent.
+
+**Ground truth** = the dock interactive-BOM (`03_Designator_drawing/*_ibom.html`, LZString-decompress
+in pure Python; pads carry a `pin1` flag + world `pos`), which mates with the real SOM. Findings, all
+relative to each connector body centre:
+
+| Conn | dock pin-1 | our footprint pin-1 (native) | verdict |
+|---|---|---|---|
+| **80-pin** (BTB9900) | (−1.54, −7.8) @ 270° → left-top | native (−7.8, +1.32) = left | **footprint OK** |
+| **100-pin** (C2399/C2400) | (−9.8, +1.54) = **left**/+y | (+9.8, +1.6) = **right**/+y | **mirror-numbered — FIXED** |
+
+The 100-pin was a pure left–right mirror (U-shape scheme, pins 1–50 / 51–100 preserved). **Fix
+(applied to the `.kicad_mod`):** renumber pads `n→51−n` (top row) / `n→151−n` (bottom row) and mirror
+the pin-1 silk dot to the left. `btb_som_pinmap.md`/`som_btb.zen` use the real Hirose contact numbering
+(transcribed from the SOM+dock schematics), so correcting the footprint makes the existing net→pad
+map physically correct — **no `.zen`/pinmap change needed.** Verified: all three pin-1s now land on
+their `som_placement` targets within 0.25 mm.
+
+**Placement rotations (in `tools/floorplan_seed.py`):** CN1 (BTB9900) = **270°**, CN2 (C2399) /
+CN3 (C2400) = **0°**. ⚠ `pcb layout` preserves existing footprint *bodies* across regen — after a
+footprint edit you must **`rm -rf layout`** (clean regen) to pull the change.
