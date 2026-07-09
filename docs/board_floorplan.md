@@ -50,13 +50,46 @@ C2399/C2400/BTB9900 geometry).
 
 ## Layout workflow (Zener-native)
 
-`Board()` has no outline parameter — the **edge cuts are drawn in KiCad**, and Zener preserves manual
-placement/outline across regenerations. So: `pcb layout appletini_mega.zen` generates the real board
-(all footprints + ratsnest) and opens KiCad; draw the 6.000"×2.750" outline + finger tab, place the
-`AppleIIBus_Edge` slot footprint on the bottom edge, then floorplan the big blocks. `pcb layout --temp`
-gives a throwaway practice board. **Open method:** bring the card edge in as a Zener component
-(footprint + 50 NC pads, excluded from BOM) so the toolchain always places it — vs. a hand-added
-mechanical footprint. Leaning toward the Zener component.
+`Board()` has no outline parameter — the **edge cuts are drawn in KiCad**. `pcb layout
+appletini_mega.zen` generates the real board (all footprints + ratsnest) and opens KiCad; draw the
+6.000"×2.750" outline + finger tab, place the `AppleIIBus_Edge` slot footprint on the bottom edge,
+then floorplan the big blocks. `pcb layout --temp` gives a throwaway practice board.
+
+**⚠ Regen preservation (tested, pcb v0.4.5) — NOT what the earlier note claimed:** a **sync** regen
+(plain `pcb layout`) **preserves footprint positions** but **regenerates all board-level graphics from
+scratch — it WIPES the Edge.Cuts outline** (and any other `gr_line`/`gr_*` you added by editing the
+file; unclear if a KiCad-*drawn*-and-saved outline survives — assume not). Positions survive because
+Zener matches footprints by stable path/uuid; board graphics are not tracked. Consequences:
+- To **open the seeded board without re-packing**, use **`pcb layout appletini_mega.zen --no-sync`**
+  (resolves the existing file, no regen) — this keeps both positions AND the outline.
+- Only run a **sync** (`pcb layout`, default) when the `.zen`/netlist changed. After a sync, the
+  outline is gone but your placement is intact → restore just the outline with
+  **`python3 tools/floorplan_seed.py --outline-only`** (does not touch positions).
+
+### `tools/floorplan_seed.py` — block-separated initial placement (2026-07-08)
+
+The `pcb layout` auto-pack piles all 136 footprints together with **no human-readable module tag**
+(each KiCad `sheetname` is a bare UUID), so you can't tell which part belongs to which block. This
+tool reads the real hierarchy from `layout/default.net` (`sheetpath names = MODULE.instance.part`) and
+moves every footprint into its block's floorplan-v1 target region (non-overlapping boxes; ICs/
+connectors in a top row, passives packed below), places the **SOM DF40s at their real
+`som_placement.md` geometry** (CN1=BTB9900, CN2=C2399, CN3=C2400 about datum (55, 34.9)), the 2×20
+CPU header (J1) on the top edge, the slot (J2) on the bottom edge, and draws the 152.4×69.85 mm
+outline rectangle. Result = each block a clearly separated cluster along the power↔USB spine.
+
+**Usage (from a fresh generate):**
+```
+pcb layout appletini_mega.zen --no-open      # generate (packed), don't open
+python3 tools/floorplan_seed.py              # separate blocks + draw outline
+pcb layout appletini_mega.zen --no-sync      # open in KiCad, preserving everything
+```
+Run the **full** seeder only for the *initial* scaffold — after you've hand-arranged parts in KiCad,
+a re-run would reset them back to the grid; use `--outline-only` instead. It's the starting scaffold,
+not final placement — drag blocks to taste; positions then persist across syncs.
+
+**Open method (card edge):** the slot is already a Zener component (`AppleIIBus_Edge`, footprint + 50
+NC pads, excluded from BOM) instantiated as `J_SLOT`/`J2` — the toolchain always places it, so the
+seeder just positions it on the bottom edge.
 
 ## Grounding topology — OPEN, and important
 
