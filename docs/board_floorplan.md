@@ -66,16 +66,26 @@ Zener matches footprints by stable path/uuid; board graphics are not tracked. Co
   outline is gone but your placement is intact → restore just the outline with
   **`python3 tools/floorplan_seed.py --outline-only`** (does not touch positions).
 
-### `tools/floorplan_seed.py` — block-separated initial placement (2026-07-08)
+### `tools/floorplan_seed.py` — labeled staging trays (2026-07-08, rev 2)
 
 The `pcb layout` auto-pack piles all 136 footprints together with **no human-readable module tag**
 (each KiCad `sheetname` is a bare UUID), so you can't tell which part belongs to which block. This
 tool reads the real hierarchy from `layout/default.net` (`sheetpath names = MODULE.instance.part`) and
-moves every footprint into its block's floorplan-v1 target region (non-overlapping boxes; ICs/
-connectors in a top row, passives packed below), places the **SOM DF40s at their real
-`som_placement.md` geometry** (CN1=BTB9900, CN2=C2399, CN3=C2400 about datum (55, 34.9)), the 2×20
-CPU header (J1) on the top edge, the slot (J2) on the bottom edge, and draws the full board
-outline. Result = each block a clearly separated cluster along the power↔USB spine.
+sorts the footprints into **labeled, non-overlapping staging trays**.
+
+**Why trays, not floorplan positions (learned the hard way):** 136 *real* footprints — a 52 mm 2×20
+header, 8 mm ICs, 23 mm DF40s, dozens of 0402s — **do not fit legibly at their floorplan positions on
+a 152×70 mm board.** Packed that tight the bodies overlap into mush and you can't tell the blocks
+apart (rev 1 tried this — it failed). So instead each block is laid out as a tidy cluster with spacing
+taken from **each footprint's real bounding box** (row-packed, zero body overlap), stacked in a column
+of labeled trays **below the board**, ordered along the power↔USB spine. A `gr_text` label over each
+tray names the block. You then **drag each recognizable, labeled cluster onto the board** at the
+floorplan-v1 position from the table above. The `--outline-only` mode redraws just the outline.
+
+- **On the board already:** the **SOM DF40 connectors** (CN1=BTB9900, CN2=C2399, CN3=C2400 at their
+  real `som_placement.md` geometry about datum (55, 34.9)) and the **slot J2** (it forms the tab) —
+  both labeled in place. Everything else is in a tray.
+- **Trays (top→bottom):** POWER · SDRAM0 · SDRAM1 · USB3/CH569 · FT2232 · APPLE BUS.
 
 **Board outline + finger tab (seeded, matches the prior board's geometry):** the card **body** is the
 152.4 × 69.85 mm (6.000″ × 2.750″) rectangle; the **2.55″ finger tab protrudes ~7.5 mm below** the
@@ -91,12 +101,13 @@ cross-checked against `/mnt/c/repos/appletini/v5/AppleTini_board_v5_2` (tab gap 
 **Usage (from a fresh generate):**
 ```
 pcb layout appletini_mega.zen --no-open      # generate (packed), don't open
-python3 tools/floorplan_seed.py              # separate blocks + draw outline
+python3 tools/floorplan_seed.py              # sort into labeled trays + draw outline
 pcb layout appletini_mega.zen --no-sync      # open in KiCad, preserving everything
 ```
-Run the **full** seeder only for the *initial* scaffold — after you've hand-arranged parts in KiCad,
-a re-run would reset them back to the grid; use `--outline-only` instead. It's the starting scaffold,
-not final placement — drag blocks to taste; positions then persist across syncs.
+Run the **full** seeder only for the *initial* sort — after you've dragged clusters onto the board,
+a re-run would reset them back into the trays; use `--outline-only` instead. The trays are a sorting
+aid, not placement — drag each labeled cluster to its floorplan-v1 spot; positions then persist across
+syncs (board graphics/labels do not — see the regen note above).
 
 **Open method (card edge):** the slot is already a Zener component (`AppleIIBus_Edge`, footprint + 50
 NC pads, excluded from BOM) instantiated as `J_SLOT`/`J2` — the toolchain always places it, so the
