@@ -92,8 +92,10 @@ floorplan-v1 position from the table above. The `--outline-only` mode redraws ju
 body bottom edge. The seeder draws the top/left/right edges full and the **bottom edge in two pieces
 with a gap** for the tab (gap = TAB_X ± 32.385 mm), positions the `AppleIIBus_Edge` slot (J2) so its
 own Edge.Cuts (tab verticals + 45° insertion chamfers + insertion edge) land exactly on the gap
-endpoints — J2 origin = `(TAB_X, body_bottom + 3.175)`. `TAB_X` (tab centre, default board centre
-76.2) = the chosen slot's X at integration; nudge it in the script if the target slot isn't centred.
+endpoints — J2 origin = `(TAB_X, body_bottom + 3.175)`. `TAB_X` is derived from **`TAB_EDGE_GAP =
+9.525 mm (0.375″)` between the tab's right edge and the card's right edge** → tab on the **right side**
+of the card, centre at 110.49 mm (tab spans X[78.10, 142.88]). Change `TAB_EDGE_GAP` if the target
+slot wants the tab elsewhere.
 The tab's `body_bottom + 3.175` offset and ±32.385 half-width come from the footprint's own geometry,
 cross-checked against `/mnt/c/repos/appletini/v5/AppleTini_board_v5_2` (tab gap 64.76 mm, protrusion
 7.5 mm, slot origin 3.18 mm below the body edge — all reproduced).

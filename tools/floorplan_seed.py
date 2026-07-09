@@ -30,7 +30,9 @@ from collections import defaultdict
 PCB = os.path.join(os.path.dirname(__file__), "..", "layout", "layout.kicad_pcb")
 NET = os.path.join(os.path.dirname(__file__), "..", "layout", "default.net")
 BW, BH = 152.4, 69.85           # card BODY rectangle (mm); tab protrudes below BH
-TAB_HALF, TAB_TOP, TAB_X = 32.385, 3.175, 76.2   # finger-tab geometry (see footprint)
+TAB_HALF, TAB_TOP = 32.385, 3.175       # finger-tab half-width + top offset (from footprint)
+TAB_EDGE_GAP = 9.525                    # 0.375" from the tab's RIGHT edge to the card's right edge
+TAB_X = BW - TAB_EDGE_GAP - TAB_HALF     # tab centre -> right side of the card (= 110.49 mm)
 
 # Blocks in power<->USB spine order, with the label drawn over each tray.
 BLOCKS = [
