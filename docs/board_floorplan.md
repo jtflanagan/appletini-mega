@@ -74,8 +74,19 @@ tool reads the real hierarchy from `layout/default.net` (`sheetpath names = MODU
 moves every footprint into its block's floorplan-v1 target region (non-overlapping boxes; ICs/
 connectors in a top row, passives packed below), places the **SOM DF40s at their real
 `som_placement.md` geometry** (CN1=BTB9900, CN2=C2399, CN3=C2400 about datum (55, 34.9)), the 2×20
-CPU header (J1) on the top edge, the slot (J2) on the bottom edge, and draws the 152.4×69.85 mm
-outline rectangle. Result = each block a clearly separated cluster along the power↔USB spine.
+CPU header (J1) on the top edge, the slot (J2) on the bottom edge, and draws the full board
+outline. Result = each block a clearly separated cluster along the power↔USB spine.
+
+**Board outline + finger tab (seeded, matches the prior board's geometry):** the card **body** is the
+152.4 × 69.85 mm (6.000″ × 2.750″) rectangle; the **2.55″ finger tab protrudes ~7.5 mm below** the
+body bottom edge. The seeder draws the top/left/right edges full and the **bottom edge in two pieces
+with a gap** for the tab (gap = TAB_X ± 32.385 mm), positions the `AppleIIBus_Edge` slot (J2) so its
+own Edge.Cuts (tab verticals + 45° insertion chamfers + insertion edge) land exactly on the gap
+endpoints — J2 origin = `(TAB_X, body_bottom + 3.175)`. `TAB_X` (tab centre, default board centre
+76.2) = the chosen slot's X at integration; nudge it in the script if the target slot isn't centred.
+The tab's `body_bottom + 3.175` offset and ±32.385 half-width come from the footprint's own geometry,
+cross-checked against `/mnt/c/repos/appletini/v5/AppleTini_board_v5_2` (tab gap 64.76 mm, protrusion
+7.5 mm, slot origin 3.18 mm below the body edge — all reproduced).
 
 **Usage (from a fresh generate):**
 ```

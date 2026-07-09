@@ -28,7 +28,14 @@ import re, sys, uuid, math, os
 
 PCB = os.path.join(os.path.dirname(__file__), "..", "layout", "layout.kicad_pcb")
 NET = os.path.join(os.path.dirname(__file__), "..", "layout", "default.net")
-BW, BH = 152.4, 69.85          # board width x height (mm)
+BW, BH = 152.4, 69.85          # card BODY width x height (mm); tab protrudes below BH
+# Finger-tab geometry (from the AppleIIBus_Edge footprint's own Edge.Cuts, confirmed
+# against the prior board): tab half-width, and the local +y of the tab TOP (where it
+# meets the body) — the footprint origin sits at body_bottom + TAB_TOP so its tab-top
+# line lands exactly on the body bottom edge. Tab is centred at TAB_X along the bottom.
+TAB_HALF = 32.385
+TAB_TOP = 3.175
+TAB_X = 76.2                    # tab centre (board centre); = chosen slot's X at integration
 
 # --- SOM datum + connector geometry (som_placement.md; frame +x right, +y down,
 #     datum = hole-rect centre). Datum placed at KiCad (55, 34.925 = BH/2). ---
@@ -41,7 +48,7 @@ SOM_CONN = {                    # refdes -> (dx,dy) body-centre offset from datu
 # Special single-part placements (refdes -> (x, y[, rot])); rot None = keep.
 SPECIAL = {
     "J1": (76.0, 4.5, 0.0),     # 2x20 CPU header, top edge, spans x 50.6..101.4
-    "J2": (76.0, 66.5, None),   # Apple II slot edge, bottom edge, centred
+    "J2": (TAB_X, BH + TAB_TOP, 0.0),   # slot: tab-top lands on body bottom edge; tab protrudes below
 }
 # Grid regions per block: (x0, y0, x1, y1) in KiCad mm. Boxes are NON-OVERLAPPING
 # so blocks never bleed into each other; parts are fit strictly inside each box
@@ -139,17 +146,26 @@ def apply(pos, move=True):
             n += k
         out.append("(footprint " + ch)
     t = "".join(out)
-    # board outline rectangle on Edge.Cuts. Idempotent: strip any prior Edge.Cuts
-    # gr_line whose endpoints both sit on the board bounding rectangle before re-adding.
-    corners = [(0.0, 0.0), (BW, 0.0), (BW, BH), (0.0, BH), (0.0, 0.0)]
-    cset = {(0.0, 0.0), (BW, 0.0), (BW, BH), (0.0, BH)}
-    def _on_rect(m):
+    # Board outline on Edge.Cuts: full top/left/right edges + a bottom edge SPLIT to
+    # leave a gap for the finger tab (the AppleIIBus_Edge footprint draws the tab's
+    # sides/chamfers/insertion edge itself, protruding below the body). Idempotent:
+    # strip any prior board-level Edge.Cuts gr_line lying on the body perimeter first.
+    e = 0.01
+    def _on_perim(x, y):
+        return abs(x) < e or abs(x - BW) < e or abs(y) < e or abs(y - BH) < e
+    def _strip(m):
         pts = [(float(m.group(1)), float(m.group(2))), (float(m.group(3)), float(m.group(4)))]
-        return "" if all(p in cset for p in pts) else m.group(0)
+        return "" if all(_on_perim(*p) for p in pts) else m.group(0)
     t = re.sub(r'\(gr_line \(start (\S+) (\S+)\) \(end (\S+) (\S+)\)'
-               r'[^\n]*Edge\.Cuts[^\n]*\)\n?', _on_rect, t)
+               r'[^\n]*Edge\.Cuts[^\n]*\)\n?', _strip, t)
+    tl, tr = TAB_X - TAB_HALF, TAB_X + TAB_HALF     # tab gap in the body bottom edge
+    segs = [((0, 0), (BW, 0)),        # top
+            ((BW, 0), (BW, BH)),      # right
+            ((BW, BH), (tr, BH)),     # bottom-right (up to tab)
+            ((tl, BH), (0, BH)),      # bottom-left  (tab gap between tl..tr)
+            ((0, BH), (0, 0))]        # left
     lines = ""
-    for (ax, ay), (bx, by) in zip(corners, corners[1:]):
+    for (ax, ay), (bx, by) in segs:
         lines += (f'\n\t(gr_line (start {ax} {ay}) (end {bx} {by}) '
                   f'(stroke (width 0.12) (type default)) (layer "Edge.Cuts") '
                   f'(uuid "{uuid.uuid4()}"))')
