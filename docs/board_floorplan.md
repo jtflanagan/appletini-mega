@@ -106,14 +106,72 @@ of cable egress.
   via ribbon pin 21**, slot fingers floating.
 - **Outline = 2.750" height (fixed) × 6.000" length (start target)**, reusing the prior board's
   `AppleIIBus_Edge` slot footprint.
+- **SOM orientation = HORIZONTAL, reference orientation, "C" opens toward the USB (right) end.**
+  SOM long-axis runs along the board length → only **35 mm tall**, which is what buys the ~19 mm
+  top strip the Apple-bus block needs. (The vertical/90°-rotated alternative gives the cleanest
+  two-sided SDRAM escape but leaves only ~13 mm at the top and forces USB onto the top edge — not
+  worth it, since SDRAM is the *most forgiving* bus and shouldn't drive the floorplan.)
+- **Machine-facing end = TOP edge, center.** The 2×20 CPU-ribbon header sits on the **top long edge**
+  (opposite the slot fingers) and the ribbon drops over the top toward the //e CPU socket. Leaves both
+  short ends free for the power↔USB spine.
+- **SOM mounting face = TOP of the carrier** (standard mezzanine), *pending* the //e slot-pitch check
+  (open Q3). Top-mount keeps inner/outer rows as documented in `som_placement.md` (a bottom-mount
+  mirror would flip them).
 
-## Open questions (to resolve as we floorplan)
+## Concrete floorplan v1 (2026-07-08)
 
-1. **SOM face + position** (first domino), then the derived placement of SDRAM0/1, CH569, FT2232.
-2. **Connector egress plan** — which edge each of {USB3, 2× USB-C, barrel jack, CPU ribbon} sits on,
-   given the card is vertical inside the case, with the finger tab down.
-3. **Slot pitch / height budget** for the //e — does the SOM stack (3 mm standoff + module height)
-   clear the neighboring card?
+Working frame: **origin = bottom-left corner, +x right, +y up, mm.** Board = `(0,0)…(152.4, 69.85)`.
+(KiCad's page frame is y-down; convert when placing. These are *target* regions to floorplan **to**
+in KiCad after `pcb layout` generates the footprints — not final routed positions.)
+
+```
+ y69.85 ┌───────────────────────────────────────────────────────────────┐
+        │  ┌───────── Apple level-shifter strip ─────────┐  ┌ 2×20 CPU ┐ │  ← ribbon
+        │  │ 5×'245  2×'T45  deadman                     │  │  HEADER  │ │    exits top
+ ~51    │  └─────────────────────────────────────────────┘  └──────────┘ │
+        │ ┌─POWER──┐  ┌──────────── SOM 45×35 ───────────┐  ┌── USB end ─┐│
+        │ │ barrel │  │ ▔C2399 (top): SDRAM0 + HSPI/BK2  │  │ CH569  SS ►││→USB3
+        │ │ MP2315 │ B│                                  │M │ 30M xtal   ││
+        │ │ AMS1117│ T│    FPGA (under SOM)       mouth  │► │ FT2232     ││→USB-C
+        │ │  bulk  │ B│                                  │O │            ││→USB-C
+        │ └────────┘ 9│ ▁C2400 (bot): SDRAM1 + VBUS + sp │U └────────────┘│
+ ~15    │      5V→    │      + Apple spill (BK6/7/8→138B5)│T  ↑SDRAM1 may   │
+        │            9└──────────────────────────────────┘   nest in mouth │
+ ~12    │  · · · · · · · · · · finger keep-out · · · · · · · · · · · · · · ·│
+ y0     └═════════════════[ slot fingers, bottom edge ]═══════════════════┘
+       x0                                                              x152.4
+```
+
+**Block targets** (bottom-left origin, mm; ± a few mm — refine visually in KiCad):
+
+| Block | X range | Y range | Anchor / why |
+|---|---|---|---|
+| **SOM body** (45×35) | 32.5 – 77.5 | 15.5 – 50.5 | **datum (hole-rect centre) = (55, 33).** Left-of-centre so the C's mouth + right end have room. |
+| — BTB9900 (L, vert) | ~32.5 (x) | ~25 – 41 | SOM left edge → faces the power/left region; JTAG+config+BANK12 escape left. |
+| — C2399 (top, horiz) | ~38.5 – 58 | ~48 – 50.5 | SDRAM0 (BANK1/2) + HSPI (BANK2). Outer row (P51–100) faces **up** toward the Apple strip. |
+| — C2400 (bot, horiz) | ~38.5 – 58 | ~15.5 – 18 | SDRAM1 + VBUS_SOM (P91–99, inner) + Apple spill. Outer row (P1–50) faces **down**. |
+| **Power** | 2 – 30 | 15 – 50 | Barrel jack on the **left short edge**; 5 V runs mid-board to C2400 VBUS pins (~40 mm, ok). |
+| **CH569 + 30 MHz xtal** | 85 – 120 | 20 – 48 | Nests in the mouth, end-on to C2399 for HSPI; xtal in a quiet pocket away from the SS pair. |
+| **USB3 USB-C** | ~148 – 152 | ~38 – 50 | **Right short edge.** Short 90 Ω SS pair from CH569, guard moat, <5 mil intra-pair. |
+| **FT2232 + its USB-C** | 118 – 150 | 14 – 34 | Same right edge, **outside** the USB3 SS keep-out. JTAG runs L across board to BTB9900 (slow, fine). |
+| **Apple shifter strip** | 30 – 105 | 51 – 62 | Top strip. A-side ← FPGA GPIO (spill on C2400, routes up on L4 — power-ref layer, immune at 1–2.8 MHz). |
+| **2×20 CPU header** | ~50 – 101 | 62 – 69.85 | **Top edge, centre** (~50.8 mm long). B-side = socket 5 V + gnd via ribbon pin 21. |
+| **Slot fingers** | ~45.7 – 106.7 | 0 – ~2 (pads) | Bottom edge, centred (final X follows the target slot); keep-out up to y≈12. Floating. |
+
+**Deferred/forgiving:** SDRAM1 is drawn under C2400 but is the *most forgiving* bus — if the finger
+keep-out squeezes the under-SOM band, **nest it in the mouth** (right of the SOM) instead; either works.
+
+## Open questions (updated 2026-07-08)
+
+1. ~~SOM face + position~~ → **resolved** (horizontal, datum (55,33), top-mount pending Q3).
+2. **Connector egress — mostly resolved:** barrel = **left short edge**; USB3 + FT2232 USB-C = **right
+   short edge**; CPU ribbon = **top edge centre**. Still to confirm at KiCad time: exact USB-C spacing on
+   the right edge and the barrel-jack height vs case.
+3. **Slot pitch / height budget** for the //e — does the top-mounted SOM stack (3 mm standoff + module +
+   its own parts, ~8–10 mm) clear the neighbouring card at the //e slot pitch (~1")? **Confirm before
+   committing top-mount** (open lock above).
+4. **Slot-finger X position** along the bottom edge — set by the chosen slot's connector location; drawn
+   centred for now, adjust once the target slot is picked.
 
 ## Ingested (2026-07-08)
 
