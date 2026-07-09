@@ -7,6 +7,21 @@ So there are three pin-behavior profiles firmware must know: (a) 6502-class = NM
 (b) W65C02S, (c) W65C816S. See docs/cpu_socket_pinout.md. The hardware here is the superset and
 serves all of them; the profile only changes which control nets firmware asserts.
 
+DESIGN DECISIONS (resolved 2026-07-08):
+  - EXACT emulation, no trimming. Every CPU output is implemented even where a given Apple model
+    ignores it -- the Apple /// actually uses a phi-out clock, and clones are unknown. Do NOT
+    optimize away phi1/phi2/status outputs to save channels.
+  - The clock (phi0/PHI2) is NOT PLL-locked. The Apple bus clock is deliberately dirty: it has a
+    stretched "long cycle" every 65th cycle (RAM/video). The FPGA samples the whole interface
+    asynchronously (CDC) against its own fclk and launches outputs by explicit fclk cycle-counting.
+    => PHI2 is a SAMPLED INPUT, not a clock -- it can land on an ORDINARY GPIO; do not spend a
+    clock-capable/GCLK/PLL pin on it.
+  - Bus float is a non-issue. The deadman holds host /RES asserted until firmware has full control
+    of the socket, so nothing on the bus matters while lines briefly float -> no bus-keepers or
+    pull resistors needed on the socket address/data/R-W lines.
+  - Single ground return (DIP pin 21) is intentional and kept 1:1. An extra ground strap to the
+    Apple board was tried on earlier cards and made noise WORSE -- the motherboard is very noisy.
+
 The carrier replaces the host CPU: a soft CPU in the GW5AT-60 drives the Apple II/IIgs bus
 through the vacated CPU socket. Physical path:
 
