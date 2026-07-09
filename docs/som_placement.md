@@ -218,5 +218,8 @@ map physically correct — **no `.zen`/pinmap change needed.** Verified: all thr
 their `som_placement` targets within 0.25 mm.
 
 **Placement rotations (in `tools/floorplan_seed.py`):** CN1 (BTB9900) = **270°**, CN2 (C2399) /
-CN3 (C2400) = **0°**. ⚠ `pcb layout` preserves existing footprint *bodies* across regen — after a
+CN3 (C2400) = **0°**. ⚠ **The pcb/KiCad layout pipeline rotates pad POSITIONS by the footprint
+angle but NOT the pad bodies** — a rotated footprint (CN1) also needs the angle set on every
+*pad* (`(at x y 270)`), or the pads render in their unrotated orientation. `floorplan_seed.py`
+does this automatically for any footprint it rotates. ⚠ `pcb layout` preserves existing footprint *bodies* across regen — after a
 footprint edit you must **`rm -rf layout`** (clean regen) to pull the change.

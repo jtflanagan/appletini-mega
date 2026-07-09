@@ -254,6 +254,16 @@ def run(move=True):
                 dx, dy = x - float(om.group(1)), y - float(om.group(2))
                 if dx or dy:
                     blk = translate_zone_pts(blk, dx, dy)
+                # This layout pipeline rotates pad POSITIONS by the footprint angle but
+                # NOT the pad bodies — so a rotated footprint needs the angle set on each
+                # pad too, else the pads stay in their unrotated orientation. Set (not add)
+                # so it's idempotent; assumes pads have inherent angle 0 (true for the DF40s,
+                # the only rotated parts). Needs a fresh `rm -rf layout` regen to take effect.
+                if rot:
+                    blk = re.sub(
+                        r'(\(pad\s+"[^"]*"\s+\S+\s+\S+\s*\(at\s+-?\d[\d.]*\s+-?\d[\d.]*)'
+                        r'(?:\s+-?\d[\d.]*)?\)',
+                        lambda m, r=rot: f"{m.group(1)} {r})", blk)
                 def repl(m, x=x, y=y, rot=rot):
                     tail = f" {rot}" if rot is not None else m.group(3)
                     return f"(at {x:.3f} {y:.3f}{tail})"
