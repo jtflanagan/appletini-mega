@@ -98,10 +98,15 @@ Capacitor(name="C_CH_33b", value="4.7uF",  package="0603", P1=P3V3.NET, P2=GND.N
 Capacitor(name="C_CH_12_1", value="1uF", package="0402", P1=P1V2.NET, P2=GND.NET)
 Capacitor(name="C_CH_12_2", value="1uF", package="0402", P1=P1V2.NET, P2=GND.NET)
 
-# 30 MHz crystal
-Crystal  (name="Y_CH", package="3225_4Pin", frequency="30MHz", XIN=_XI, XOUT=_XO, GND=GND.NET)
-Capacitor(name="C_CH_X1", value="12pF", package="0402", P1=_XI, P2=GND.NET)
-Capacitor(name="C_CH_X2", value="12pF", package="0402", P1=_XO, P2=GND.NET)
+# 30 MHz crystal (USB3 PLL reference — jitter-critical, see docs/som_placement.md).
+# Pinned to a real LCSC-stocked part: YXC X322530MSB4SI, 3.2x2.5 4-pad, 30.000MHz, +/-10ppm,
+# CL=20pF (LCSC-native, ~14k stock). Loading caps sized to its 20pF CL: C1=C2=2*(CL-Cstray)
+# = 2*(20 - ~3pF stray) ~= 33pF (was a 12pF placeholder, which targets an ~8pF-CL crystal).
+Crystal  (name="Y_CH", package="3225_4Pin", frequency="30MHz", load_capacitance="20pF",
+          mpn="X322530MSB4SI", manufacturer="YXC Crystal Oscillators",
+          XIN=_XI, XOUT=_XO, GND=GND.NET)
+Capacitor(name="C_CH_X1", value="33pF", package="0402", P1=_XI, P2=GND.NET)
+Capacitor(name="C_CH_X2", value="33pF", package="0402", P1=_XO, P2=GND.NET)
 
 # SS TX AC-coupling (100nF) CH569 -> USB-C TX1
 Capacitor(name="C_SSTXP", value="100nF", package="0201", P1=_SSTXA, P2=_TX1P)
