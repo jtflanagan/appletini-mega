@@ -114,9 +114,14 @@ of cable egress.
 - **Machine-facing end = TOP edge, center.** The 2×20 CPU-ribbon header sits on the **top long edge**
   (opposite the slot fingers) and the ribbon drops over the top toward the //e CPU socket. Leaves both
   short ends free for the power↔USB spine.
-- **SOM mounting face = TOP of the carrier** (standard mezzanine), *pending* the //e slot-pitch check
-  (open Q3). Top-mount keeps inner/outer rows as documented in `som_placement.md` (a bottom-mount
-  mirror would flip them).
+- **SOM mounting face = TOP of the carrier (LOCKED).** Apple II cards project **upward** out of the
+  slot with a **consistent component side** (each card's tall face looks at the next card's bare back),
+  so the ~1″ //e slot pitch easily clears a one-sided ~8–10 mm SOM stack. → **Top-mount** the SOM (and
+  every tall part). This keeps inner/outer rows exactly as documented in `som_placement.md` (a
+  bottom-mount mirror would flip them and lose the SDRAM1-escapes-outward geometry). **Design rule:**
+  all tall parts (SOM, barrel jack, USB-C, 2×20 header, electrolytics) on the **top/component face**;
+  **bottom face = low-profile SMD only** (min profile — small decoupling may still tuck under the SOM in
+  the ~3 mm standoff gap).
 
 ## Concrete floorplan v1 (2026-07-08)
 
@@ -167,9 +172,9 @@ keep-out squeezes the under-SOM band, **nest it in the mouth** (right of the SOM
 2. **Connector egress — mostly resolved:** barrel = **left short edge**; USB3 + FT2232 USB-C = **right
    short edge**; CPU ribbon = **top edge centre**. Still to confirm at KiCad time: exact USB-C spacing on
    the right edge and the barrel-jack height vs case.
-3. **Slot pitch / height budget** for the //e — does the top-mounted SOM stack (3 mm standoff + module +
-   its own parts, ~8–10 mm) clear the neighbouring card at the //e slot pitch (~1")? **Confirm before
-   committing top-mount** (open lock above).
+3. ~~Slot pitch / height budget~~ → **resolved:** top-mount locked (see lock above). ~1″ pitch + the
+   consistent-component-side convention clears the one-sided SOM stack; tall parts go top, bottom stays
+   low-profile.
 4. **Slot-finger X position** along the bottom edge — set by the chosen slot's connector location; drawn
    centred for now, adjust once the target slot is picked.
 
