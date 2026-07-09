@@ -131,9 +131,12 @@ def compute():
     byblk = load_blocks()
     place = {}
     labels = []            # (x, y, text)
-    # SOM connectors keep real DF40 geometry on the board (they anchor the SOM)
+    # SOM connectors keep real DF40 geometry on the board (they anchor the SOM).
+    # CN1 (BTB9900, 80-pin) is VERTICAL -> rotate 270deg so pin 1 lands outer(left)-top
+    # per som_placement.md; CN2/CN3 (100-pin) are horizontal at native rotation.
+    som_rot = {"CN1": 270}
     for r, (dx, dy) in {"CN1": (-19.85, 0), "CN2": (-6.47, -14.67), "CN3": (-6.47, 14.74)}.items():
-        place[r] = (55.0 + dx, BH / 2 + dy)
+        place[r] = (55.0 + dx, BH / 2 + dy, som_rot.get(r))
     place["J2"] = (TAB_X, BH + TAB_TOP)          # slot: forms the tab in the outline
     labels.append((30.0, 12.0, "SOM DF40 connectors (on board): CN1=BTB9900 CN2=C2399 CN3=C2400"))
     labels.append((TAB_X - 24, BH - 2, "slot finger tab (mechanical)"))
@@ -215,9 +218,14 @@ def run(move=True):
             out.append(t[last:a])
             ref = fp_ref(blk)
             if ref in place:
-                x, y = place[ref]
+                val = place[ref]
+                x, y = val[0], val[1]
+                rot = val[2] if len(val) > 2 else None
+                def repl(m, x=x, y=y, rot=rot):
+                    tail = f" {rot}" if rot is not None else m.group(3)
+                    return f"(at {x:.3f} {y:.3f}{tail})"
                 blk, k = re.subn(r'\(at (-?\d[\d.]*) (-?\d[\d.]*)((?: -?\d[\d.]*)?)\)',
-                                 lambda m: f"(at {x:.3f} {y:.3f}{m.group(3)})", blk, count=1)
+                                 repl, blk, count=1)
                 n += k
             out.append(blk); last = b
         out.append(t[last:])
