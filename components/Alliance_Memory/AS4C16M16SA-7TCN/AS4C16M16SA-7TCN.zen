@@ -1,5 +1,5 @@
 """
-AS4C16M16SA-7BCN
+AS4C16M16SA-7TCN
 
 Auto-generated using `pcb search`.
 """
@@ -50,12 +50,12 @@ VSS = io(Net)
 VSSQ = io(Net)
 
 Component(
-    name="AS4C16M16SA-7BCN",
-    symbol=Symbol(library="AS4C16M16SA-7BCN.kicad_sym"),
+    name="AS4C16M16SA-7TCN",
+    symbol=Symbol(library="AS4C16M16SA-7TCN.kicad_sym"),
     pins={
         "A0": A0,
         "A1": A1,
-        "A10": A10,
+        "A10/AP": A10,
         "A11": A11,
         "A12": A12,
         "A2": A2,

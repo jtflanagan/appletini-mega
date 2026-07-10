@@ -1,10 +1,13 @@
 """
 sdram — 32-bit-wide SDR SDRAM (soft-CPU FETCH path), two INDEPENDENT 16-bit devices.
 
-Two AS4C16M16SA (256Mbit, 16Mx16, TSOP-54) SDR SDRAMs. This is the committed part: a
-JEDEC-standard 256Mbit x16 SDR SDRAM, LCSC-stocked with a verified ECAD model — chosen over
-the originally-planned Winbond W9825G6KH (JEDEC-identical, but no LCSC model) for exactly that
-reason. Each device is wired as its OWN point-to-point bus (independent address/BA/command/
+Two AS4C16M16SA-7TCN (256Mbit, 16Mx16, 143MHz, 54-pin TSOP-II) SDR SDRAMs. JEDEC-standard
+256Mbit x16 SDR SDRAM, LCSC-stocked with a verified ECAD model — chosen over the originally-
+planned Winbond W9825G6KH (JEDEC-identical, but no LCSC model). PACKAGE = TSOP, not the BGA
+(-7BCN) variant: same die/pinout/timing, but the board is not space-constrained, so TSOP wins
+on routing (perimeter escape, no BGA vias), JLCPCB assembly cost/risk, price, and stock — and
+it makes the open ULX3S / MiSTer SDRAM layouts directly usable as routing references.
+Each device is wired as its OWN point-to-point bus (independent address/BA/command/
 clock) rather than a shared bus: the two 16-bit halves land on separate DF40 connectors
 (C2399 BANK1/2 vs C2400 BANK6/7/8), so independent routing keeps each bus bank-local and
 point-to-point (see CARRIER_PLAN + the routing discussion). Data forms the 32-bit word:
@@ -15,7 +18,7 @@ them to the SOM balls (SDRAM0/U_LO -> C2399 BANK1/2, SDRAM1/U_HI -> C2400 BANK6/
 signal<->ball pairing is a bank-correct starting map, re-optimised for escape at P&R time.
 """
 
-SDRAM = Module("../components/Alliance_Memory/AS4C16M16SA-7BCN/AS4C16M16SA-7BCN.zen")
+SDRAM = Module("../components/Alliance_Memory/AS4C16M16SA-7TCN/AS4C16M16SA-7TCN.zen")
 Capacitor = Module("@stdlib/generics/Capacitor.zen")
 
 # ---- ports: the top-level owns the rails + the FPGA-side signal nets and connects them
