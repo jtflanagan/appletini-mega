@@ -1,16 +1,28 @@
 """
-sdram — 32-bit-wide SDR SDRAM (soft-CPU FETCH path), two INDEPENDENT 16-bit devices.
+sdram — 32-bit-wide SDR SDRAM (soft-CPU FETCH path), one UNIFIED 32-bit datapath.
 
-Two AS4C16M16SA (256Mbit, 16Mx16, TSOP-54) SDR SDRAMs. This is the committed part: a
-JEDEC-standard 256Mbit x16 SDR SDRAM, LCSC-stocked with a verified ECAD model — chosen over
-the originally-planned Winbond W9825G6KH (JEDEC-identical, but no LCSC model) for exactly that
-reason. Each device is wired as its OWN point-to-point bus (independent address/BA/command/
-clock) rather than a shared bus: the two 16-bit halves land on separate DF40 connectors
-(C2399 BANK1/2 vs C2400 BANK6/7/8), so independent routing keeps each bus bank-local and
-point-to-point (see CARRIER_PLAN + the routing discussion). Data forms the 32-bit word:
-U_LO=DQ[15:0], U_HI=DQ[31:16].
+Two AS4C16M16SA (256Mbit, 16Mx16, TSOP-54) SDR SDRAMs operated as a single logical
+32-bit device: U_LO=DQ[15:0], U_HI=DQ[31:16]. This is the committed part: a JEDEC-standard
+256Mbit x16 SDR SDRAM, LCSC-stocked with a verified ECAD model — chosen over the originally-
+planned Winbond W9825G6KH (JEDEC-identical, but no LCSC model) for exactly that reason.
 
-UNWIRED this round: pins carry per-device local nets (labels); FPGA wiring comes later.
+Topology: both devices run in lockstep off a SHARED address/bank/clock/command bus, so the
+FPGA issues one command per 32-bit access. The four byte lanes keep INDEPENDENT masks so the
+controller can byte/halfword write into the 32-bit word:
+
+    DQM0 = U_LO.LDQM -> byte0 = DQ[7:0]      DQM2 = U_HI.LDQM -> byte2 = DQ[23:16]
+    DQM1 = U_LO.UDQM -> byte1 = DQ[15:8]     DQM3 = U_HI.UDQM -> byte3 = DQ[31:24]
+
+(SDRAM DQM is the byte read output-enable and the byte write mask, i.e. the per-byte write
+enable — preserved here for all 4 bytes.)
+
+NOTE — routing change vs. the earlier independent-bus revision: sharing address/command/clock
+turns the two point-to-point buses into one bus that fans out across both DF40 connectors
+(C2399 BANK1/2 and C2400 BANK6/7/8). That bus is no longer bank-local/point-to-point, so it
+needs fly-by or short-stub routing and clock/address de-skew across the two devices at the
+target SDR rate (see CARRIER_PLAN + the routing discussion). Data (DQ) stays per-device.
+
+UNWIRED this round: pins carry local nets (labels); FPGA wiring comes later.
 """
 
 SDRAM = Module("../components/Alliance_Memory/AS4C16M16SA-7BCN/AS4C16M16SA-7BCN.zen")
@@ -19,32 +31,39 @@ Capacitor = Module("@stdlib/generics/Capacitor.zen")
 VDD = Power("SDRAM_VDD_3V3")   # 3.3V rail (from power module; unwired here)
 GND = Ground()
 
-# ===== U_LO — low 16 bits, DQ[15:0]  (independent bus A) =====
+# ===== Shared 32-bit-datapath bus (both x16 devices in lockstep) =====
+A0  = Net("SDRAM_A0")
+A1  = Net("SDRAM_A1")
+A2  = Net("SDRAM_A2")
+A3  = Net("SDRAM_A3")
+A4  = Net("SDRAM_A4")
+A5  = Net("SDRAM_A5")
+A6  = Net("SDRAM_A6")
+A7  = Net("SDRAM_A7")
+A8  = Net("SDRAM_A8")
+A9  = Net("SDRAM_A9")
+A10 = Net("SDRAM_A10")
+A11 = Net("SDRAM_A11")
+A12 = Net("SDRAM_A12")
+BA0 = Net("SDRAM_BA0")
+BA1 = Net("SDRAM_BA1")
+CLK = Net("SDRAM_CLK")
+CKE = Net("SDRAM_CKE")
+N_CS  = Net("SDRAM_N_CS")
+N_RAS = Net("SDRAM_N_RAS")
+N_CAS = Net("SDRAM_N_CAS")
+N_WE  = Net("SDRAM_N_WE")
+
+# ===== U_LO — low 16 bits, DQ[15:0] =====
 SDRAM(
     name="ULO",
-    A0=Net("SDRAM_ULO_A0"),
-    A1=Net("SDRAM_ULO_A1"),
-    A2=Net("SDRAM_ULO_A2"),
-    A3=Net("SDRAM_ULO_A3"),
-    A4=Net("SDRAM_ULO_A4"),
-    A5=Net("SDRAM_ULO_A5"),
-    A6=Net("SDRAM_ULO_A6"),
-    A7=Net("SDRAM_ULO_A7"),
-    A8=Net("SDRAM_ULO_A8"),
-    A9=Net("SDRAM_ULO_A9"),
-    A10=Net("SDRAM_ULO_A10"),
-    A11=Net("SDRAM_ULO_A11"),
-    A12=Net("SDRAM_ULO_A12"),
-    BA0=Net("SDRAM_ULO_BA0"),
-    BA1=Net("SDRAM_ULO_BA1"),
-    CLK=Net("SDRAM_ULO_CLK"),
-    CKE=Net("SDRAM_ULO_CKE"),
-    N_CS=Net("SDRAM_ULO_N_CS"),
-    N_RAS=Net("SDRAM_ULO_N_RAS"),
-    N_CAS=Net("SDRAM_ULO_N_CAS"),
-    N_WE=Net("SDRAM_ULO_N_WE"),
-    LDQM=Net("SDRAM_ULO_LDQM"),
-    UDQM=Net("SDRAM_ULO_UDQM"),
+    A0=A0, A1=A1, A2=A2, A3=A3, A4=A4, A5=A5, A6=A6,
+    A7=A7, A8=A8, A9=A9, A10=A10, A11=A11, A12=A12,
+    BA0=BA0, BA1=BA1,
+    CLK=CLK, CKE=CKE,
+    N_CS=N_CS, N_RAS=N_RAS, N_CAS=N_CAS, N_WE=N_WE,
+    LDQM=Net("SDRAM_DQM0"),   # byte0 = DQ[7:0]
+    UDQM=Net("SDRAM_DQM1"),   # byte1 = DQ[15:8]
     DQ0=Net("SDRAM_DQ0"),
     DQ1=Net("SDRAM_DQ1"),
     DQ2=Net("SDRAM_DQ2"),
@@ -70,32 +89,16 @@ Capacitor(name="C_ULO_2", value="100nF", package="0402", P1=VDD.NET, P2=GND.NET)
 Capacitor(name="C_ULO_3", value="100nF", package="0402", P1=VDD.NET, P2=GND.NET)
 Capacitor(name="C_ULO_4", value="100nF", package="0402", P1=VDD.NET, P2=GND.NET)
 
-# ===== U_HI — high 16 bits, DQ[31:16] (independent bus B) =====
+# ===== U_HI — high 16 bits, DQ[31:16] =====
 SDRAM(
     name="UHI",
-    A0=Net("SDRAM_UHI_A0"),
-    A1=Net("SDRAM_UHI_A1"),
-    A2=Net("SDRAM_UHI_A2"),
-    A3=Net("SDRAM_UHI_A3"),
-    A4=Net("SDRAM_UHI_A4"),
-    A5=Net("SDRAM_UHI_A5"),
-    A6=Net("SDRAM_UHI_A6"),
-    A7=Net("SDRAM_UHI_A7"),
-    A8=Net("SDRAM_UHI_A8"),
-    A9=Net("SDRAM_UHI_A9"),
-    A10=Net("SDRAM_UHI_A10"),
-    A11=Net("SDRAM_UHI_A11"),
-    A12=Net("SDRAM_UHI_A12"),
-    BA0=Net("SDRAM_UHI_BA0"),
-    BA1=Net("SDRAM_UHI_BA1"),
-    CLK=Net("SDRAM_UHI_CLK"),
-    CKE=Net("SDRAM_UHI_CKE"),
-    N_CS=Net("SDRAM_UHI_N_CS"),
-    N_RAS=Net("SDRAM_UHI_N_RAS"),
-    N_CAS=Net("SDRAM_UHI_N_CAS"),
-    N_WE=Net("SDRAM_UHI_N_WE"),
-    LDQM=Net("SDRAM_UHI_LDQM"),
-    UDQM=Net("SDRAM_UHI_UDQM"),
+    A0=A0, A1=A1, A2=A2, A3=A3, A4=A4, A5=A5, A6=A6,
+    A7=A7, A8=A8, A9=A9, A10=A10, A11=A11, A12=A12,
+    BA0=BA0, BA1=BA1,
+    CLK=CLK, CKE=CKE,
+    N_CS=N_CS, N_RAS=N_RAS, N_CAS=N_CAS, N_WE=N_WE,
+    LDQM=Net("SDRAM_DQM2"),   # byte2 = DQ[23:16]
+    UDQM=Net("SDRAM_DQM3"),   # byte3 = DQ[31:24]
     DQ0=Net("SDRAM_DQ16"),
     DQ1=Net("SDRAM_DQ17"),
     DQ2=Net("SDRAM_DQ18"),
