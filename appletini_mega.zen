@@ -1,21 +1,34 @@
 """
 appletini-mega — Apple II/IIgs accelerator carrier for a Sipeed Tang Mega 60K SOM.
 
-Top-level board. This round instantiates each subsystem so every part is *allocated*.
-Inter-subsystem wiring is intentionally deferred (see CARRIER_PLAN.md — "wiring is a big
-discussion"): modules are placed but their external nets are left unconnected for now.
+Top-level board. WIRING (2026-07-09): all subsystems joined; every functional bus mapped to
+the SOM balls. Done here, in order:
+  * RAILS: one shared GND + P5V + P3V3, owned here and passed into every module's rail io()
+    ports (the modules used to each declare private GND/P3V3 nets that never joined).
+  * SDRAM (fetch path): SDRAM0 (U_LO, DQ[15:0]) -> C2399, SDRAM1 (U_HI, DQ[31:16]) -> C2400.
+  * HSPI: CH569 (slave) <-> FPGA (master), 32 data + 2 clocks + 6 handshake, near CH569.
+  * Apple bus: cpu_socket A-side (16A + 8D + status/flip + control) <-> SOM.
+  * JTAG/UART: FT2232 ch.A -> SOM BANK12 config balls; ch.B UART console.
+
+BALL POOL MODEL (per the SOM cross-die contract, CLAUDE.md): the SOM I/O balls are ONE pool
+-- bank number and connector are NOT routing constraints. The only ball-choice rules are:
+skip the 1.5V balls (60K BANK9), keep clock-capable (GCLK) pins for signals that need them (the
+HSPI RX/TX clocks ARE placed on GCLK balls -- see the HSPI map), and prefer escape convenience. So every
+signal-to-ball assignment here is a *starting* map (deterministic, disjoint, verified); the
+exact ball for each bit is re-optimised for clean escape at place-and-route -- what is fixed
+is the connectivity (which chip pin reaches a SOM ball, on which rails).
 
 Subsystems:
   - som_btb      Tang Mega 60K SOM board-to-board (DF40) connectors + all labeled pins
   - power        12 V barrel -> buck 5 V (VBUS_SOM) -> 3.3 V (VCCIO / logic / IC rails)
-  - sdram        2x Winbond W9825G6KH 16-bit SDR, wired as one 32-bit-wide bus (fetch path)
+  - sdram        2x AS4C16M16SA 16-bit SDR, wired as one 32-bit-wide bus (fetch path)
   - programming  FT2232H (ch.A = JTAG/MPSSE, ch.B = UART console) + 12 MHz xtal + USB-C
   - usb3         WCH CH569 HSPI<->USB3 SuperSpeed bridge + 30 MHz xtal + USB3 connector
   - cpu_socket   6502/65816 CPU-socket bus interface (LXC level shifters + deadman reset)
 """
 
 SomBtb = Module("modules/som_btb.zen")
-Power = Module("modules/power.zen")
+PowerMod = Module("modules/power.zen")  # not 'Power' -- that's the builtin net constructor
 Sdram = Module("modules/sdram.zen")
 Programming = Module("modules/programming.zen")
 Usb3Bridge = Module("modules/usb3.zen")
@@ -28,10 +41,253 @@ Board(
     layers=6,  # dense 0.4mm DF40 escape (3 conns) + two 32-bit buses + USB3 SS; 4 layers too tight
 )
 
-SomBtb(name="SOM")
-Power(name="PWR")
-Sdram(name="SDRAM")
-Programming(name="PROG")
-Usb3Bridge(name="USB3")
-CpuSocket(name="CPU")
+# ============================================================================
+# Shared board rails (owned here; power SOURCES them, everyone else CONSUMES them).
+# All VCCIO banks in use are the 3.3 V grouping (legal on both dies -- see CLAUDE.md).
+# ============================================================================
+GND = Ground()
+P5V = Power("P5V")  # VBUS_SOM 5V (buck output) -> SOM P5V pins
+P3V3 = Power("P3V3")  # 3.3V (LDO output) -> logic + VCCIO + IC rails
+
+# ============================================================================
+# SDRAM pilot wiring: (sdram_port, som_ball, functional_net) triples.
+# One Net per functional name, passed to BOTH the SDRAM device port and the SOM ball port
+# so the two module-local nodes become the SAME physical net.
+# ============================================================================
+_SDRAM_MAP = [
+    ("ULO_DQ0", "SOM_E17", "SDRAM_DQ0"),
+    ("ULO_DQ1", "SOM_B18", "SDRAM_DQ1"),
+    ("ULO_DQ2", "SOM_F16", "SDRAM_DQ2"),
+    ("ULO_DQ3", "SOM_B17", "SDRAM_DQ3"),
+    ("ULO_DQ4", "SOM_D16", "SDRAM_DQ4"),
+    ("ULO_DQ5", "SOM_C17", "SDRAM_DQ5"),
+    ("ULO_DQ6", "SOM_E16", "SDRAM_DQ6"),
+    ("ULO_DQ7", "SOM_D17", "SDRAM_DQ7"),
+    ("ULO_DQ8", "SOM_D15", "SDRAM_DQ8"),
+    ("ULO_DQ9", "SOM_A16", "SDRAM_DQ9"),
+    ("ULO_DQ10", "SOM_D14", "SDRAM_DQ10"),
+    ("ULO_DQ11", "SOM_A15", "SDRAM_DQ11"),
+    ("ULO_DQ12", "SOM_F15", "SDRAM_DQ12"),
+    ("ULO_DQ13", "SOM_B16", "SDRAM_DQ13"),
+    ("ULO_DQ14", "SOM_F14", "SDRAM_DQ14"),
+    ("ULO_DQ15", "SOM_B15", "SDRAM_DQ15"),
+    ("ULO_A0", "SOM_F13", "SDRAM0_A0"),
+    ("ULO_A1", "SOM_A14", "SDRAM0_A1"),
+    ("ULO_A2", "SOM_A13", "SDRAM0_A2"),
+    ("ULO_A3", "SOM_B13", "SDRAM0_A3"),
+    ("ULO_A4", "SOM_C13", "SDRAM0_A4"),
+    ("ULO_A5", "SOM_C15", "SDRAM0_A5"),
+    ("ULO_A6", "SOM_C14", "SDRAM0_A6"),
+    ("ULO_A7", "SOM_E14", "SDRAM0_A7"),
+    ("ULO_A8", "SOM_E13", "SDRAM0_A8"),
+    ("ULO_A9", "SOM_C20", "SDRAM0_A9"),
+    ("ULO_A10", "SOM_A21", "SDRAM0_A10"),
+    ("ULO_A11", "SOM_D20", "SDRAM0_A11"),
+    ("ULO_A12", "SOM_B21", "SDRAM0_A12"),
+    ("ULO_BA0", "SOM_D19", "SDRAM0_BA0"),
+    ("ULO_BA1", "SOM_A20", "SDRAM0_BA1"),
+    ("ULO_N_CS", "SOM_E19", "SDRAM0_NCS"),
+    ("ULO_N_RAS", "SOM_B20", "SDRAM0_NRAS"),
+    ("ULO_N_CAS", "SOM_C19", "SDRAM0_NCAS"),
+    ("ULO_N_WE", "SOM_A19", "SDRAM0_NWE"),
+    ("ULO_CLK", "SOM_C18", "SDRAM0_CLK"),
+    ("ULO_CKE", "SOM_A18", "SDRAM0_CKE"),
+    ("ULO_LDQM", "SOM_H15", "SDRAM0_LDQM"),
+    ("ULO_UDQM", "SOM_J15", "SDRAM0_UDQM"),
+    ("UHI_DQ0", "SOM_P17", "SDRAM_DQ16"),
+    ("UHI_DQ1", "SOM_N17", "SDRAM_DQ17"),
+    ("UHI_DQ2", "SOM_N15", "SDRAM_DQ18"),
+    ("UHI_DQ3", "SOM_N13", "SDRAM_DQ19"),
+    ("UHI_DQ4", "SOM_N14", "SDRAM_DQ20"),
+    ("UHI_DQ5", "SOM_U16", "SDRAM_DQ21"),
+    ("UHI_DQ6", "SOM_T15", "SDRAM_DQ22"),
+    ("UHI_DQ7", "SOM_V15", "SDRAM_DQ23"),
+    ("UHI_DQ8", "SOM_R16", "SDRAM_DQ24"),
+    ("UHI_DQ9", "SOM_U15", "SDRAM_DQ25"),
+    ("UHI_DQ10", "SOM_P15", "SDRAM_DQ26"),
+    ("UHI_DQ11", "SOM_R14", "SDRAM_DQ27"),
+    ("UHI_DQ12", "SOM_P14", "SDRAM_DQ28"),
+    ("UHI_DQ13", "SOM_T14", "SDRAM_DQ29"),
+    ("UHI_DQ14", "SOM_W22", "SDRAM_DQ30"),
+    ("UHI_DQ15", "SOM_W21", "SDRAM_DQ31"),
+    ("UHI_A0", "SOM_AA21", "SDRAM1_A0"),
+    ("UHI_A1", "SOM_AA20", "SDRAM1_A1"),
+    ("UHI_A2", "SOM_Y17", "SDRAM1_A2"),
+    ("UHI_A3", "SOM_AB17", "SDRAM1_A3"),
+    ("UHI_A4", "SOM_AA16", "SDRAM1_A4"),
+    ("UHI_A5", "SOM_AB16", "SDRAM1_A5"),
+    ("UHI_A6", "SOM_AA15", "SDRAM1_A6"),
+    ("UHI_A7", "SOM_W16", "SDRAM1_A7"),
+    ("UHI_A8", "SOM_Y16", "SDRAM1_A8"),
+    ("UHI_A9", "SOM_W15", "SDRAM1_A9"),
+    ("UHI_A10", "SOM_V13", "SDRAM1_A10"),
+    ("UHI_A11", "SOM_Y22", "SDRAM1_A11"),
+    ("UHI_A12", "SOM_Y21", "SDRAM1_A12"),
+    ("UHI_BA0", "SOM_V20", "SDRAM1_BA0"),
+    ("UHI_BA1", "SOM_AB22", "SDRAM1_BA1"),
+    ("UHI_N_CS", "SOM_U20", "SDRAM1_NCS"),
+    ("UHI_N_RAS", "SOM_AB21", "SDRAM1_NRAS"),
+    ("UHI_N_CAS", "SOM_AB20", "SDRAM1_NCAS"),
+    ("UHI_N_WE", "SOM_AA19", "SDRAM1_NWE"),
+    ("UHI_CLK", "SOM_W20", "SDRAM1_CLK"),
+    ("UHI_CKE", "SOM_W19", "SDRAM1_CKE"),
+    ("UHI_LDQM", "SOM_AB18", "SDRAM1_LDQM"),
+    ("UHI_UDQM", "SOM_AA18", "SDRAM1_UDQM"),
+]
+_snets = {nn: Net(nn) for (_sp, _sb, nn) in _SDRAM_MAP}
+_sdram_kw = {sp: _snets[nn] for (sp, _sb, nn) in _SDRAM_MAP}
+
+# _som_kw accumulates every SOM ball-port connection across subsystems (one big ball pool;
+# bank/connector are not routing constraints -- see CLAUDE.md). SDRAM first:
+_som_kw = {sb: _snets[nn] for (_sp, sb, nn) in _SDRAM_MAP}
+
+# ============================================================================
+# HSPI wiring: CH569 (HSPI slave) <-> FPGA (HSPI master). (ch569_pin, som_ball, net) triples.
+# Map = authoritative CH569 pin-mux (CH569WSCH) -> balls picked from the pool near CH569 (left).
+# HD0-31 are a byte-lane-swappable bus; the two clocks are flagged for clock-capable balls.
+# CLOCKS on clock-capable (GCLK) balls, from the Gowin PBGA484A.json "CFG" field: HRCLK (FPGA's
+# source-sync RX capture clock) -> SOM_K18 = 60K GCLKT_6; HTCLK (forwarded TX clock) -> SOM_J20 =
+# 60K GCLKT_5 (both BANK5, in the HSPI field). The displaced data bits HD16/HD20 took R18/T18.
+# ============================================================================
+_HSPI_MAP = [
+    ("PA5", "SOM_L14", "HSPI_HD0"),
+    ("PA4", "SOM_L15", "HSPI_HD1"),
+    ("PA22", "SOM_N20", "HSPI_HD2"),
+    ("PA3", "SOM_M20", "HSPI_HD3"),
+    ("PA2", "SOM_N22", "HSPI_HD4"),
+    ("PA1", "SOM_M22", "HSPI_HD5"),
+    ("PA0", "SOM_M21", "HSPI_HD6"),
+    ("PB21", "SOM_L21", "HSPI_HD7"),
+    ("PB20", "SOM_N18", "HSPI_HD8"),
+    ("PB19", "SOM_L19", "HSPI_HD9"),
+    ("PB18", "SOM_N19", "HSPI_HD10"),
+    ("PB17", "SOM_L20", "HSPI_HD11"),
+    ("PA17", "SOM_M18", "HSPI_HD12"),
+    ("PB16", "SOM_K21", "HSPI_HD13"),
+    ("PB15", "SOM_L18", "HSPI_HD14"),
+    ("PB14", "SOM_K22", "HSPI_HD15"),
+    ("PB0", "SOM_R18", "HSPI_HD16"),
+    ("PB1", "SOM_J22", "HSPI_HD17"),
+    ("PB2", "SOM_K19", "HSPI_HD18"),
+    ("PA20", "SOM_H22", "HSPI_HD19"),
+    ("PB3", "SOM_T18", "HSPI_HD20"),
+    ("PB4", "SOM_J21", "HSPI_HD21"),
+    ("PB5", "SOM_J19", "HSPI_HD22"),
+    ("PB6", "SOM_H19", "HSPI_HD23"),
+    ("PA16", "SOM_H20", "HSPI_HD24"),
+    ("PB7", "SOM_G20", "HSPI_HD25"),
+    ("PB8", "SOM_L16", "HSPI_HD26"),
+    ("PB9", "SOM_K16", "HSPI_HD27"),
+    ("PB10", "SOM_H17", "HSPI_HD28"),
+    ("PB11", "SOM_H18", "HSPI_HD29"),
+    ("PB12", "SOM_G17", "HSPI_HD30"),
+    ("PB13", "SOM_G18", "HSPI_HD31"),
+    ("PA11", "SOM_J20", "HSPI_HTCLK"),
+    ("PA19", "SOM_K18", "HSPI_HRCLK"),
+    ("PA9", "SOM_R17", "HSPI_HTREQ"),
+    ("PA10", "SOM_P16", "HSPI_HTACK"),
+    ("PA21", "SOM_U22", "HSPI_HTVLD"),
+    ("PA23", "SOM_U21", "HSPI_HTRDY"),
+    ("PA18", "SOM_T21", "HSPI_HRACK"),
+    ("PA6", "SOM_T20", "HSPI_HRVLD"),
+]
+_hnets = {nn: Net(nn) for (_p, _b, nn) in _HSPI_MAP}
+_som_kw.update({b: _hnets[nn] for (_p, b, nn) in _HSPI_MAP})
+_hspi_ch_kw = {"CH_" + p: _hnets[nn] for (p, _b, nn) in _HSPI_MAP}
+
+# ============================================================================
+# Apple-bus wiring: cpu_socket FPGA-facing ports (A-side of the LXC shifters + control)
+# <-> SOM balls. 1-2.8 MHz, the MOST forgiving bus -> any 3.3V ball, routes freely (inner
+# layer). Net name == port name. (cpu_socket_port, som_ball, net):
+# ============================================================================
+_APPLE_MAP = [
+    ("F_A0", "SOM_Y19", "F_A0"),
+    ("F_A1", "SOM_Y18", "F_A1"),
+    ("F_A2", "SOM_W17", "F_A2"),
+    ("F_A3", "SOM_V17", "F_A3"),
+    ("F_A4", "SOM_U18", "F_A4"),
+    ("F_A5", "SOM_U17", "F_A5"),
+    ("F_A6", "SOM_AB15", "F_A6"),
+    ("F_A7", "SOM_W14", "F_A7"),
+    ("F_A8", "SOM_V14", "F_A8"),
+    ("F_A9", "SOM_AA14", "F_A9"),
+    ("F_A10", "SOM_M17", "F_A10"),
+    ("F_A11", "SOM_M16", "F_A11"),
+    ("F_A12", "SOM_M15", "F_A12"),
+    ("F_A13", "SOM_M13", "F_A13"),
+    ("F_A14", "SOM_L13", "F_A14"),
+    ("F_A15", "SOM_U9", "F_A15"),
+    ("F_D0", "SOM_U10", "F_D0"),
+    ("F_D1", "SOM_U11", "F_D1"),
+    ("F_D2", "SOM_U8", "F_D2"),
+    ("F_D3", "SOM_K14", "F_D3"),
+    ("F_D4", "SOM_K13", "F_D4"),
+    ("F_D5", "SOM_T16", "F_D5"),
+    ("F_D6", "SOM_H14", "F_D6"),
+    ("F_D7", "SOM_J14", "F_D7"),
+    ("F_RW", "SOM_G16", "F_RW"),
+    ("F_SYNC_VPA", "SOM_G15", "F_SYNC_VPA"),
+    ("F_PHI2O_VDA", "SOM_G13", "F_PHI2O_VDA"),
+    ("F_MLB", "SOM_H13", "F_MLB"),
+    ("F_E", "SOM_J16", "F_E"),
+    ("F_VPB", "SOM_J17", "F_VPB"),
+    ("F_PHI2", "SOM_K17", "F_PHI2"),
+    ("F_RES", "SOM_G21", "F_RES"),
+    ("F_IRQ", "SOM_G22", "F_IRQ"),
+    ("F_NMI", "SOM_F19", "F_NMI"),
+    ("F_RDY", "SOM_F18", "F_RDY"),
+    ("F_BE", "SOM_F20", "F_BE"),
+    ("F_P3", "SOM_E18", "F_P3"),
+    ("F_P38", "SOM_F21", "F_P38"),
+    ("CPU_OE_N", "SOM_C22", "CPU_OE_N"),
+    ("CPU_DATA_DIR", "SOM_E22", "CPU_DATA_DIR"),
+    ("CPU_P3_DIR", "SOM_B22", "CPU_P3_DIR"),
+    ("CPU_P38_DIR", "SOM_D22", "CPU_P38_DIR"),
+    ("F_RES_REL", "SOM_E21", "F_RES_REL"),
+    ("CPU_5V_ABSENT", "SOM_D21", "CPU_5V_ABSENT"),
+]
+_anets = {nn: Net(nn) for (_p, _b, nn) in _APPLE_MAP}
+_som_kw.update({b: _anets[nn] for (_p, b, nn) in _APPLE_MAP})
+_cpu_kw = {p: _anets[nn] for (p, _b, nn) in _APPLE_MAP}
+
+# ============================================================================
+# JTAG (FT2232 ch.A -> SOM BANK12 config balls) + UART console (ch.B) + config-status readback.
+# DONE/READY are the SOM's own role-named config pins (BTB9900); FT2232 ACBUS0/1 poll them.
+# (ft_port, som_ball_port, net):
+# ============================================================================
+_JTU_MAP = [
+    ("FT_JTAG_TCK", "SOM_T13", "FT_JTAG_TCK"),
+    ("FT_JTAG_TMS", "SOM_U13", "FT_JTAG_TMS"),
+    ("FT_JTAG_TDI", "SOM_V12", "FT_JTAG_TDI"),
+    ("FT_JTAG_TDO", "SOM_R13", "FT_JTAG_TDO"),
+    ("FT_UART_TX", "SOM_R19", "FT_UART_TX"),
+    ("FT_UART_RX", "SOM_P19", "FT_UART_RX"),
+    ("FT_CFG_DONE", "SOM_DONE", "CFG_DONE"),
+    ("FT_CFG_READY", "SOM_READY", "CFG_READY"),
+]
+_jnets = {nn: Net(nn) for (_p, _b, nn) in _JTU_MAP}
+_som_kw.update({b: _jnets[nn] for (_p, b, nn) in _JTU_MAP})
+_prog_kw = {p: _jnets[nn] for (p, _b, nn) in _JTU_MAP}
+
+# ============================================================================
+# Instantiate subsystems with rails wired. Signals wired: SDRAM + HSPI. Apple/JTAG next.
+# ============================================================================
+PowerMod(name="PWR", GND=GND, P5V=P5V, P3V3=P3V3)
+
+SomBtb(
+    name="SOM",
+    GND=GND,
+    P5V=P5V,
+    VCCIO_1_2=P3V3,
+    VCCIO_4_5=P3V3,
+    VCCIO_6_7_8=P3V3,  # SDRAM banks (3.3V)
+    # VCCIO_138B5 left unconnected -- voltage TBD, no pilot signal uses it (see som_btb.zen)
+    **_som_kw,
+)
+
+Sdram(name="SDRAM", GND=GND, VDD=P3V3, **_sdram_kw)
+
+Programming(name="PROG", GND=GND, P3V3=P3V3, **_prog_kw)
+Usb3Bridge(name="USB3", GND=GND, P3V3=P3V3, **_hspi_ch_kw)
+CpuSocket(name="CPU", GND=GND, P3V3=P3V3, **_cpu_kw)
 Mechanical(name="MECH")

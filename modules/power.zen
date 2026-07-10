@@ -16,47 +16,52 @@ mapped by the standard DC-005/044 convention (center=+12V, sleeve=GND, switch=GN
 pin-to-terminal against the footprint before layout.
 """
 
-Resistor  = Module("@stdlib/generics/Resistor.zen")
+Resistor = Module("@stdlib/generics/Resistor.zen")
 Capacitor = Module("@stdlib/generics/Capacitor.zen")
-Inductor  = Module("@stdlib/generics/Inductor.zen")
-Tvs       = Module("@stdlib/generics/Tvs.zen")
+Inductor = Module("@stdlib/generics/Inductor.zen")
+Tvs = Module("@stdlib/generics/Tvs.zen")
 BarrelJack = Module("../components/JLCPCB_Assembly/POWER-JACK/POWER-JACK.zen")
-Fuse      = Module("../components/Bourns_Inc/MF-MSMF110-2/MF-MSMF110-2.zen")   # 1.1A hold PPTC
-Mosfet    = Module("../components/ElecSuper/AO3401A/AO3401A.zen")              # P-FET, reverse-polarity
-MP2315    = Module("../components/JLCPCB_Assembly/MP2315/MP2315.zen")
-AMS1117   = Module("../components/Fosan/AMS1117-3_3/AMS1117-3_3.zen")
+Fuse = Module("../components/Bourns_Inc/MF-MSMF110-2/MF-MSMF110-2.zen")  # 1.1A hold PPTC
+Mosfet = Module("../components/ElecSuper/AO3401A/AO3401A.zen")  # P-FET, reverse-polarity
+MP2315 = Module("../components/JLCPCB_Assembly/MP2315/MP2315.zen")
+AMS1117 = Module("../components/Fosan/AMS1117-3_3/AMS1117-3_3.zen")
 
-GND  = Ground()
+# Rails are now PORTS (this module SOURCES them for the whole board): the top-level
+# owns the shared GND / P5V / P3V3 nets and passes them in, so power's buck/LDO outputs
+# land on the same nets every other subsystem consumes. P12V is internal (raw input only).
+GND = io("GND", Ground)
+P5V = io("P5V", Power)
+P3V3 = io("P3V3", Power)
 P12V = Power("P12V")
-P5V  = Power("P5V")
-P3V3 = Power("P3V3")
 
 # ---- input: barrel jack -> PPTC fuse -> reverse-polarity P-FET -> P12V (protected) ----
-_VIN = Net("VIN_RAW"); _VIN_F = Net("VIN_FUSED"); _PGATE = Net("RP_GATE")
-BarrelJack(name="J_PWR", P1=_VIN, P2=GND.NET, P3=GND.NET)       # 1=center/+12V, 2=sleeve/GND, 3=switch->GND (verify)
-Fuse(name="F_IN", P1=_VIN, P2=_VIN_F)                          # 1.1A resettable PPTC (overcurrent)
-Mosfet(name="Q_RP", D=_VIN_F, S=P12V, G=_PGATE)                # P-FET reverse-polarity: D=in, S=load, G=in-GND
-Resistor(name="R_RP", value="100kohm", package="0402", P1=_PGATE, P2=GND.NET)   # gate to input return
-Tvs(name="D_IN", package="DO-214AA", K=P12V.NET, A=GND)        # SMB clamp on protected rail
-Capacitor(name="C_IN1", value="10uF",  package="1206", P1=P12V.NET, P2=GND.NET)
-Capacitor(name="C_IN2", value="10uF",  package="1206", P1=P12V.NET, P2=GND.NET)
+_VIN = Net("VIN_RAW")
+_VIN_F = Net("VIN_FUSED")
+_PGATE = Net("RP_GATE")
+BarrelJack(name="J_PWR", P1=_VIN, P2=GND.NET, P3=GND.NET)  # 1=center/+12V, 2=sleeve/GND, 3=switch->GND (verify)
+Fuse(name="F_IN", P1=_VIN, P2=_VIN_F)  # 1.1A resettable PPTC (overcurrent)
+Mosfet(name="Q_RP", D=_VIN_F, S=P12V, G=_PGATE)  # P-FET reverse-polarity: D=in, S=load, G=in-GND
+Resistor(name="R_RP", value="100kohm", package="0402", P1=_PGATE, P2=GND.NET)  # gate to input return
+Tvs(name="D_IN", package="DO-214AA", K=P12V.NET, A=GND)  # SMB clamp on protected rail
+Capacitor(name="C_IN1", value="10uF", package="1206", P1=P12V.NET, P2=GND.NET)
+Capacitor(name="C_IN2", value="10uF", package="1206", P1=P12V.NET, P2=GND.NET)
 
 # ---- 12V -> 5V : MP2315 synchronous buck ----
-_SW  = Net("PWR_SW")
+_SW = Net("PWR_SW")
 _BST = Net("PWR_BST")
 _FB5 = Net("PWR_FB5")
 _VCC = Net("PWR_VCC")
 _AAM = Net("PWR_AAM")
 MP2315(name="U_BUCK", IN=P12V, SW=_SW, GND=GND, FB=_FB5, EN=P12V, BST=_BST, VCC=_VCC, AAM=_AAM)
-Inductor (name="L_BUCK", value="2.2uH", package="1210", P1=_SW,      P2=P5V.NET)
-Capacitor(name="C_BST",  value="100nF", package="0402", P1=_SW,      P2=_BST)
-Capacitor(name="C_VCC",  value="1uF",   package="0402", P1=_VCC,     P2=GND.NET)
-Resistor (name="R_FB1",  value="52.3kohm", package="0402", P1=P5V.NET, P2=_FB5)   # 5V from 0.8V ref
-Resistor (name="R_FB2",  value="10kohm",   package="0402", P1=_FB5,    P2=GND.NET)
-Capacitor(name="C_O5A",  value="22uF",  package="0805", P1=P5V.NET,  P2=GND.NET)
-Capacitor(name="C_O5B",  value="22uF",  package="0805", P1=P5V.NET,  P2=GND.NET)
+Inductor(name="L_BUCK", value="2.2uH", package="1210", P1=_SW, P2=P5V.NET)
+Capacitor(name="C_BST", value="100nF", package="0402", P1=_SW, P2=_BST)
+Capacitor(name="C_VCC", value="1uF", package="0402", P1=_VCC, P2=GND.NET)
+Resistor(name="R_FB1", value="52.3kohm", package="0402", P1=P5V.NET, P2=_FB5)  # 5V from 0.8V ref
+Resistor(name="R_FB2", value="10kohm", package="0402", P1=_FB5, P2=GND.NET)
+Capacitor(name="C_O5A", value="22uF", package="0805", P1=P5V.NET, P2=GND.NET)
+Capacitor(name="C_O5B", value="22uF", package="0805", P1=P5V.NET, P2=GND.NET)
 
 # ---- 5V -> 3.3V : AMS1117-3.3 LDO ----
 AMS1117(name="U_LDO", VIN=P5V, VOUT=P3V3, VSS=GND)
-Capacitor(name="C_LDO_I", value="10uF", package="0805", P1=P5V.NET,  P2=GND.NET)
+Capacitor(name="C_LDO_I", value="10uF", package="0805", P1=P5V.NET, P2=GND.NET)
 Capacitor(name="C_LDO_O", value="22uF", package="0805", P1=P3V3.NET, P2=GND.NET)

@@ -180,7 +180,12 @@ of cable egress.
   **bottom face = low-profile SMD only** (min profile — small decoupling may still tuck under the SOM in
   the ~3 mm standoff gap).
 
-## Concrete floorplan v1 (2026-07-08)
+## Concrete floorplan v1 (2026-07-08) — SUPERSEDED by v2 below
+
+> **Superseded 2026-07-09 by floorplan-v2** (SOM centered; USB/bridges moved to the LEFT
+> against BTB9900; SDRAM to the right; CPU header near the slot). Kept for the rationale
+> (SOM orientation, top-mount, grounding) which v2 inherits unchanged. Read v2 for the
+> actual block placement.
 
 Working frame: **origin = bottom-left corner, +x right, +y up, mm.** Board = `(0,0)…(152.4, 69.85)`.
 (KiCad's page frame is y-down; convert when placing. These are *target* regions to floorplan **to**
@@ -222,6 +227,64 @@ in KiCad after `pcb layout` generates the footprints — not final routed positi
 
 **Deferred/forgiving:** SDRAM1 is drawn under C2400 but is the *most forgiving* bus — if the finger
 keep-out squeezes the under-SOM band, **nest it in the mouth** (right of the SOM) instead; either works.
+
+## Concrete floorplan v2 (2026-07-09) — CURRENT
+
+Chosen after the first wiring pass. Same SOM orientation/mount/grounding decisions as v1
+(all still locked), but a different block arrangement that is **more bank-coherent**: the two
+subsystems that talk to **BTB9900** (the SOM's LEFT connector) — **CH569/HSPI** (BANK5) and
+**FT2232/JTAG+config** (BANK12/3) — move to the **left** so their buses escape straight into
+BTB9900; the two **SDRAMs** (C2399 BANK1/2, C2400 BANK6/7/8, the top/bottom connectors) sit to
+the **right** in the C's mouth; the Apple-bus glue fills the far right. This drops the long
+cross-board HSPI/JTAG runs that v1 implied (v1 put USB on the right, away from BTB9900).
+
+Working frame: **origin = bottom-left, +x right, +y up, mm.** Board = `(0,0)…(152.4, 69.85)`.
+
+```
+ y69.85 ┌───────────────────────────────────────────────────────────────┐
+        │ ┌─ POWER ──┐                                ┌ SDRAM0 → C2399 ┐  │
+        │ │ barrel   │        ┌──── SOM 45×35 ────┐   │  (AS4C16M16)   │  │
+ ~50    │ │ MP2315   │      C2399(top) ▔▔▔▔▔▔▔▔▔   └────────────────┘     │
+        │ │ AMS1117  │   B  ┌───────────────────┐   ┌── Apple glue ──┐   │
+        │ ├──────────┤   T  │  FPGA (under SOM) │M  │ 5×'245 2×'T45  │   │
+ ~35    │ │ CH569 SS►│──9│──│                   │►O │ deadman        │   │→ (ribbon
+        │ │ 30M xtal │   9  │                   │U  └────────────────┘    │  drops to
+        │ ├──────────┤   0  └───────────────────┘   ┌ SDRAM1 → C2400 ┐   │  CPU skt)
+ ~18    │ │ FT2232   │   0  C2400(bot) ▁▁▁▁▁▁▁▁▁    │  (AS4C16M16)   │   │
+        │ │ USB-C ►  │                              └────────────────┘   │
+ ~13    │ └──────────┘   ┌═ 2×20 CPU HEADER (horiz, near slot) ═┐         │
+ ~12    │ · · · · · · · · · · · finger keep-out · · · · · · · · · · · · · ·│
+ y0     └═════════════════[ slot fingers, bottom edge ]═══════════════════┘
+       x0  ← left: power + the two BTB9900 bridges          right: SDRAM + glue →  x152.4
+```
+
+**Block targets** (bottom-left origin, mm; ± a few mm — refine in KiCad):
+
+| Block | X range | Y range | Anchor / why |
+|---|---|---|---|
+| **SOM body** (45×35) | ~53.7 – 98.7 | ~17.4 – 52.4 | **datum = board centre (76.2, 34.9).** Centered; C opens right into the SDRAM field. |
+| — BTB9900 (CN1, L, vert) | ~56.4 (x) | ~27 – 43 | SOM left edge → faces the left bridges; HSPI(BANK5)+JTAG/config(BANK12/3) escape left. |
+| — C2399 (CN2, top, horiz) | ~63 – 76 | ~48 – 51 | SDRAM0 (BANK1/2). |
+| — C2400 (CN3, bot, horiz) | ~63 – 76 | ~19 – 22 | SDRAM1 (BANK6/7/8). |
+| **Power** | 2 – 28 | ~42 – 68 | Upper-left corner; barrel on the left short edge. |
+| **CH569 + SS USB3** | 2 – 30 | ~24 – 42 | Mid-left; short HSPI run right into BTB9900; SS pair to a left-edge USB conn. |
+| **FT2232 + USB-C** | 2 – 30 | ~4 – 24 | Bottom-left; JTAG/UART up into BTB9900. |
+| **SDRAM0** (→ C2399) | ~100 – 126 | ~38 – 52 | Upper-right, against C2399 (top). Bank-local BANK1/2 (+2 borrowed BANK4). |
+| **SDRAM1** (→ C2400) | ~100 – 126 | ~16 – 30 | Lower-right, against C2400 (bottom). Bank-local BANK6/7/8. |
+| **Apple glue** (5×'245, 2×'T45, deadman) | ~126 – 150 | ~16 – 55 | Far right, past the SDRAMs. A-side ← FPGA GPIO on C2400 spill. |
+| **2×20 CPU header** | ~95 – 146 | ~13 – 19 | **Horizontal, low/right near the slot** — ribbon drops toward the //e CPU socket. |
+| **Slot fingers** | ~78 – 143 | 0 – ~2 | Bottom edge (tab centre 110.49). Floating (mechanical only). |
+
+**Change vs v1 / open at KiCad time:**
+- USB/bridges moved **right → left**; SDRAM moved **mouth → clean right field**; CPU header moved
+  from the **top edge** (v1 lock) to **horizontal near the slot** — this revises the v1 "machine-facing
+  end = top edge" note; the ribbon now exits low toward the motherboard CPU socket. Confirm the ribbon
+  reach and that the header/glue clear the finger keep-out (y≲12).
+- "SDRAM0 near C2 / SDRAM1 near C1" (as stated) is read as SDRAM0↔C2399(top), SDRAM1↔C2400(bottom) —
+  forced by bank locality (SDRAM0=U_LO=BANK1/2, SDRAM1=U_HI=BANK6/7/8), matching the wiring in
+  `appletini_mega.zen`.
+- Seeder (`tools/floorplan_seed.py`) updated: SOM anchor datum → board centre (76.2). Trays are still
+  a staging aid below the board — drag each labeled cluster to its target above.
 
 ## Open questions (updated 2026-07-08)
 

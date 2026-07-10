@@ -84,32 +84,46 @@ HOST-5V DETECTION:
   resistive divider it wastes no current when idle and needs no analog threshold. Firmware checks
   this before enabling the bus / releasing reset.
 
-UNWIRED this round (like the other modules): the A-side / control / sense nets (F_* and the
-CPU_* control nets) are local placeholders here; they map onto SOM BTB balls in the wiring phase.
+WIRED (attempt 2): the A-side / control / sense nets (F_* and the CPU_* control nets) are io()
+ports; the top maps them onto SOM balls (the 1-2.8 MHz Apple bus is the most forgiving -> any
+3.3V ball, routes freely). Socket-side (SKT_*), shifter-B (XB_*), and the 5V gate stay internal.
 Passive values are sensible starting points.
 """
 
-Resistor  = Module("@stdlib/generics/Resistor.zen")
+Resistor = Module("@stdlib/generics/Resistor.zen")
 Capacitor = Module("@stdlib/generics/Capacitor.zen")
 PinHeader = Module("@stdlib/generics/PinHeader.zen")
 
 Xcvr8 = Module("../components/Texas_Instruments/SN74LXC8T245PWR/SN74LXC8T245PWR.zen")
 Xcvr1 = Module("../components/Texas_Instruments/SN74LXC1T45DBVR/SN74LXC1T45DBVR.zen")
-Nfet  = Module("../components/Jiangsu_Changjing_Electronics_Technology_Co_Ltd/2N7002/2N7002.zen")
-OdInv = Module("../components/Texas_Instruments/SN74LVC1G06DBVR/SN74LVC1G06DBVR.zen")  # inverting open-drain, 5V-tolerant out
+Nfet = Module("../components/Jiangsu_Changjing_Electronics_Technology_Co_Ltd/2N7002/2N7002.zen")
+OdInv = Module(
+    "../components/Texas_Instruments/SN74LVC1G06DBVR/SN74LVC1G06DBVR.zen"
+)  # inverting open-drain, 5V-tolerant out
 
-GND  = Ground()
-P3V3 = Power("P3V3")            # carrier 3.3 V -> all VCCA
-SKT_5V = Net("SKT_5V")          # host socket 5 V (DIP pin 8) -> all VCCB, pull-ups, divider
+GND = io("GND", Ground)  # shared board ground (top-level owns it)
+P3V3 = io("P3V3", Power)  # carrier 3.3 V -> all VCCA (shared rail from power module)
+SKT_5V = Net("SKT_5V")  # host socket 5 V (DIP pin 8) -> all VCCB, pull-ups, divider
+# NOTE: host-side (arrives via ribbon pin 8), NOT a carrier rail -> stays local
 
-# ---- control / sense nets (defaults set by the pulls below) ----
-OE_N     = Net("CPU_OE_N")        # global ~OE for the five '245s (pU = disabled until FPGA drives low)
-DATA_DIR = Net("CPU_DATA_DIR")    # data '245 DIR (pD = default sense)
-P3_DIR   = Net("CPU_P3_DIR")      # pin-3 flip DIR   (pD = default sense)
-P38_DIR  = Net("CPU_P38_DIR")     # pin-38 flip DIR  (pD = default sense)
-RES_G    = Net("CPU_RES_HOLD_G")  # deadman FET gate (5V domain: pulled to socket 5V)
-F_RES_REL = Net("F_RES_REL")      # FPGA GPIO -> inverting-OD buffer input; drive HIGH to release reset
-V5_ABSENT = Net("CPU_5V_ABSENT")  # host-5V detect (MOSFET): LOW = 5V present, HIGH = host unpowered -> FPGA input
+
+# --- FPGA-facing nets (the A-side bus + control/sense) are exposed as optional io() PORTS so
+# the top-level maps them onto SOM balls (one big ball pool -- bank/connector are not routing
+# constraints; only 1.5V balls and clock-capable pins are special). A port the parent leaves
+# unconnected falls back to its local net, so the module still builds before the Apple bus is
+# wired. Socket-side (SKT_*), shifter-B (XB_*), and the 5V-domain gate (RES_G) stay internal. ---
+def _fpin(nm):
+    return io(nm, Net, optional=True) or Net(nm)
+
+
+# ---- control / sense nets (FPGA GPIO; defaults set by the pulls below) ----
+OE_N = _fpin("CPU_OE_N")  # global ~OE for the five '245s (pU = disabled until FPGA drives low)
+DATA_DIR = _fpin("CPU_DATA_DIR")  # data '245 DIR (pD = default sense)
+P3_DIR = _fpin("CPU_P3_DIR")  # pin-3 flip DIR   (pD = default sense)
+P38_DIR = _fpin("CPU_P38_DIR")  # pin-38 flip DIR  (pD = default sense)
+RES_G = Net("CPU_RES_HOLD_G")  # deadman FET gate (5V domain: pulled to socket 5V) -- INTERNAL
+F_RES_REL = _fpin("F_RES_REL")  # FPGA GPIO -> inverting-OD buffer input; drive HIGH to release reset
+V5_ABSENT = _fpin("CPU_5V_ABSENT")  # host-5V detect (MOSFET): LOW = 5V present, HIGH = host unpowered -> FPGA input
 
 # ============================================================================
 # Nets: A side (FPGA, 3.3V) = F_* ; shifter B side (pre series-R) = XB_* ;
@@ -117,44 +131,69 @@ V5_ABSENT = Net("CPU_5V_ABSENT")  # host-5V detect (MOSFET): LOW = 5V present, H
 # ============================================================================
 
 # ---- 16-bit address bus A0..A15 (DIP 9..20, 22..25) : always FPGA->socket ----
-F_A   = [Net("F_A%d"   % i) for i in range(16)]
-XB_A  = [Net("XB_A%d"  % i) for i in range(16)]
+F_A = [_fpin("F_A%d" % i) for i in range(16)]
+XB_A = [Net("XB_A%d" % i) for i in range(16)]
 SKT_A = [Net("SKT_A%d" % i) for i in range(16)]
 
 # ---- 8-bit data bus D0..D7 (DIP 33..26) : bidirectional, DIR = CPU_DATA_DIR ----
-F_D   = [Net("F_D%d"   % i) for i in range(8)]
-XB_D  = [Net("XB_D%d"  % i) for i in range(8)]
+F_D = [_fpin("F_D%d" % i) for i in range(8)]
+XB_D = [Net("XB_D%d" % i) for i in range(8)]
 SKT_D = [Net("SKT_D%d" % i) for i in range(8)]
 
 # ---- misc CPU-output signals (grouped onto U_OUT3) : always FPGA->socket ----
 # VPB (pin 1) is a driven CPU output on CMOS parts; see the fail-safe note above.
 OUT_NAMES = ["RW", "SYNC_VPA", "PHI2O_VDA", "MLB", "E", "VPB"]
-F_O   = {n: Net("F_"   + n) for n in OUT_NAMES}
-XB_O  = {n: Net("XB_"  + n) for n in OUT_NAMES}
+F_O = {n: _fpin("F_" + n) for n in OUT_NAMES}
+XB_O = {n: Net("XB_" + n) for n in OUT_NAMES}
 SKT_O = {n: Net("SKT_" + n) for n in OUT_NAMES}
 
 # ---- misc CPU-input signals (grouped onto U_IN) : always socket->FPGA ----
 IN_NAMES = ["PHI2", "RES", "IRQ", "NMI", "RDY", "BE"]
-F_I   = {n: Net("F_"   + n) for n in IN_NAMES}
+F_I = {n: _fpin("F_" + n) for n in IN_NAMES}
 SKT_I = {n: Net("SKT_" + n) for n in IN_NAMES}  # inputs: DIR-strapped to sense -> no series R, B pin = header pin
 
 # ---- direction-flip pins 3 and 38 (one single-bit translator each) ----
-F_P3  = Net("F_P3");   XB_P3  = Net("XB_P3");   SKT_P3  = Net("SKT_P3")
-F_P38 = Net("F_P38");  XB_P38 = Net("XB_P38");  SKT_P38 = Net("SKT_P38")
+F_P3 = _fpin("F_P3")
+XB_P3 = Net("XB_P3")
+SKT_P3 = Net("SKT_P3")
+F_P38 = _fpin("F_P38")
+XB_P38 = Net("XB_P38")
+SKT_P38 = Net("SKT_P38")
 
 # ============================================================================
 # Level-shifter helpers
 # ============================================================================
 
+
 def xcvr8(name, a8, b8, dir):
     # a8/b8 are 8-element net lists; A side = FPGA, B side = socket
     Xcvr8(
-        name=name, VCCA=P3V3, VCCB=SKT_5V, GND=GND, DIR=dir, N_OE=OE_N,
-        A1=a8[0], A2=a8[1], A3=a8[2], A4=a8[3], A5=a8[4], A6=a8[5], A7=a8[6], A8=a8[7],
-        B1=b8[0], B2=b8[1], B3=b8[2], B4=b8[3], B5=b8[4], B6=b8[5], B7=b8[6], B8=b8[7],
+        name=name,
+        VCCA=P3V3,
+        VCCB=SKT_5V,
+        GND=GND,
+        DIR=dir,
+        N_OE=OE_N,
+        A1=a8[0],
+        A2=a8[1],
+        A3=a8[2],
+        A4=a8[3],
+        A5=a8[4],
+        A6=a8[5],
+        A7=a8[6],
+        A8=a8[7],
+        B1=b8[0],
+        B2=b8[1],
+        B3=b8[2],
+        B4=b8[3],
+        B5=b8[4],
+        B6=b8[5],
+        B7=b8[6],
+        B8=b8[7],
     )
     Capacitor(name="C_" + name + "A", value="100nF", package="0402", P1=P3V3.NET, P2=GND.NET)
-    Capacitor(name="C_" + name + "B", value="100nF", package="0402", P1=SKT_5V,   P2=GND.NET)
+    Capacitor(name="C_" + name + "B", value="100nF", package="0402", P1=SKT_5V, P2=GND.NET)
+
 
 # U_OUT1 : A0-A7 (DIR high)
 xcvr8("U_OUT1", F_A[0:8], XB_A[0:8], P3V3)
@@ -162,23 +201,27 @@ xcvr8("U_OUT1", F_A[0:8], XB_A[0:8], P3V3)
 xcvr8("U_OUT2", F_A[8:16], XB_A[8:16], P3V3)
 # U_OUT3 : R/W, SYNC/VPA, PHI2O/VDA, MLB, E, VPB + 2 spare (DIR high)
 _sp = [Net("U_OUT3_SPARE%d" % i) for i in range(2)]
-xcvr8("U_OUT3",
-      [F_O["RW"],  F_O["SYNC_VPA"],  F_O["PHI2O_VDA"],  F_O["MLB"],  F_O["E"],  F_O["VPB"],  _sp[0], _sp[1]],
-      [XB_O["RW"], XB_O["SYNC_VPA"], XB_O["PHI2O_VDA"], XB_O["MLB"], XB_O["E"], XB_O["VPB"], _sp[0], _sp[1]],
-      P3V3)
+xcvr8(
+    "U_OUT3",
+    [F_O["RW"], F_O["SYNC_VPA"], F_O["PHI2O_VDA"], F_O["MLB"], F_O["E"], F_O["VPB"], _sp[0], _sp[1]],
+    [XB_O["RW"], XB_O["SYNC_VPA"], XB_O["PHI2O_VDA"], XB_O["MLB"], XB_O["E"], XB_O["VPB"], _sp[0], _sp[1]],
+    P3V3,
+)
 # U_IN : PHI2, /RES, /IRQ, /NMI, RDY, BE + 2 spare (DIR low)
 _spin = [Net("U_IN_SPARE%d" % i) for i in range(2)]
-xcvr8("U_IN",
-      [F_I["PHI2"],  F_I["RES"],  F_I["IRQ"],  F_I["NMI"],  F_I["RDY"],  F_I["BE"],  _spin[0], _spin[1]],
-      [SKT_I["PHI2"], SKT_I["RES"], SKT_I["IRQ"], SKT_I["NMI"], SKT_I["RDY"], SKT_I["BE"], _spin[0], _spin[1]],
-      GND)
+xcvr8(
+    "U_IN",
+    [F_I["PHI2"], F_I["RES"], F_I["IRQ"], F_I["NMI"], F_I["RDY"], F_I["BE"], _spin[0], _spin[1]],
+    [SKT_I["PHI2"], SKT_I["RES"], SKT_I["IRQ"], SKT_I["NMI"], SKT_I["RDY"], SKT_I["BE"], _spin[0], _spin[1]],
+    GND,
+)
 # U_DATA : D0-D7 (DIR = CPU_DATA_DIR)
 xcvr8("U_DATA", F_D, XB_D, DATA_DIR)
 
 # U_FLIP3 / U_FLIP38 : single-bit, independent DIR, NO output-enable on this part
-Xcvr1(name="U_FLIP3",  VCCA=P3V3, VCCB=SKT_5V, GND=GND, DIR=P3_DIR,  A=F_P3,  B=XB_P3)
+Xcvr1(name="U_FLIP3", VCCA=P3V3, VCCB=SKT_5V, GND=GND, DIR=P3_DIR, A=F_P3, B=XB_P3)
 Xcvr1(name="U_FLIP38", VCCA=P3V3, VCCB=SKT_5V, GND=GND, DIR=P38_DIR, A=F_P38, B=XB_P38)
-Capacitor(name="C_FLIP3B",  value="100nF", package="0402", P1=SKT_5V, P2=GND.NET)
+Capacitor(name="C_FLIP3B", value="100nF", package="0402", P1=SKT_5V, P2=GND.NET)
 Capacitor(name="C_FLIP38B", value="100nF", package="0402", P1=SKT_5V, P2=GND.NET)
 
 # ============================================================================
@@ -187,22 +230,22 @@ Capacitor(name="C_FLIP38B", value="100nF", package="0402", P1=SKT_5V, P2=GND.NET
 # sense so they can never be driven toward the host, and near-end R would not terminate a
 # host-driven line anyway; those channels wire straight to the header (B pin = SKT_I).
 # ============================================================================
-_ = [Resistor(name="R_A%d"  % i, value="100ohm", package="0402", P1=XB_A[i], P2=SKT_A[i]) for i in range(16)]
-_ = [Resistor(name="R_D%d"  % i, value="100ohm", package="0402", P1=XB_D[i], P2=SKT_D[i]) for i in range(8)]
+_ = [Resistor(name="R_A%d" % i, value="100ohm", package="0402", P1=XB_A[i], P2=SKT_A[i]) for i in range(16)]
+_ = [Resistor(name="R_D%d" % i, value="100ohm", package="0402", P1=XB_D[i], P2=SKT_D[i]) for i in range(8)]
 _ = [Resistor(name="R_O_" + n, value="100ohm", package="0402", P1=XB_O[n], P2=SKT_O[n]) for n in OUT_NAMES]
-Resistor(name="R_P3",  value="100ohm", package="0402", P1=XB_P3,  P2=SKT_P3)
+Resistor(name="R_P3", value="100ohm", package="0402", P1=XB_P3, P2=SKT_P3)
 Resistor(name="R_P38", value="100ohm", package="0402", P1=XB_P38, P2=SKT_P38)
 
 # ============================================================================
 # Default-safe pulls on the control nets
 # ============================================================================
-Resistor(name="R_OE_PU",   value="100kohm", package="0402", P1=OE_N,     P2=P3V3.NET)  # buffers OFF by default
-Resistor(name="R_DDIR_PD", value="100kohm", package="0402", P1=DATA_DIR, P2=GND.NET)   # data default = sense
-Resistor(name="R_P3_PD",   value="100kohm", package="0402", P1=P3_DIR,   P2=GND.NET)   # flip default = sense
-Resistor(name="R_P38_PD",  value="100kohm", package="0402", P1=P38_DIR,  P2=GND.NET)
+Resistor(name="R_OE_PU", value="100kohm", package="0402", P1=OE_N, P2=P3V3.NET)  # buffers OFF by default
+Resistor(name="R_DDIR_PD", value="100kohm", package="0402", P1=DATA_DIR, P2=GND.NET)  # data default = sense
+Resistor(name="R_P3_PD", value="100kohm", package="0402", P1=P3_DIR, P2=GND.NET)  # flip default = sense
+Resistor(name="R_P38_PD", value="100kohm", package="0402", P1=P38_DIR, P2=GND.NET)
 
 # socket-side bias: BE high (buffers-active sense), RDY pull-up, /RES pull-up
-Resistor(name="R_BE_PU",  value="10kohm", package="0402", P1=SKT_I["BE"],  P2=SKT_5V)
+Resistor(name="R_BE_PU", value="10kohm", package="0402", P1=SKT_I["BE"], P2=SKT_5V)
 Resistor(name="R_RDY_PU", value="10kohm", package="0402", P1=SKT_I["RDY"], P2=SKT_5V)
 Resistor(name="R_RES_PU", value="3.3kohm", package="0402", P1=SKT_I["RES"], P2=SKT_5V)
 
@@ -222,10 +265,12 @@ Resistor(name="R_RES_PU", value="3.3kohm", package="0402", P1=SKT_I["RES"], P2=S
 # ============================================================================
 Nfet(name="Q_RES", D=SKT_I["RES"], S=GND.NET, G=RES_G)
 OdInv(name="U_RESBUF", A=F_RES_REL, Y=RES_G, VCC=P3V3, GND=GND, NC=Net("U_RESBUF_NC"))
-Resistor(name="R_RESG_PU",  value="10kohm",  package="0402", P1=RES_G,     P2=SKT_5V)    # gate held high by HOST 5V
-Resistor(name="R_RESREL_PD", value="100kohm", package="0402", P1=F_RES_REL, P2=GND.NET)  # default input low = reset held
-Capacitor(name="C_RESBUF",  value="100nF",  package="0402", P1=P3V3.NET,  P2=GND.NET)    # buffer VCC decoupling
-Capacitor(name="C_RESG",    value="1nF",    package="0402", P1=RES_G,     P2=GND.NET)     # gate noise filter
+Resistor(name="R_RESG_PU", value="10kohm", package="0402", P1=RES_G, P2=SKT_5V)  # gate held high by HOST 5V
+Resistor(
+    name="R_RESREL_PD", value="100kohm", package="0402", P1=F_RES_REL, P2=GND.NET
+)  # default input low = reset held
+Capacitor(name="C_RESBUF", value="100nF", package="0402", P1=P3V3.NET, P2=GND.NET)  # buffer VCC decoupling
+Capacitor(name="C_RESG", value="1nF", package="0402", P1=RES_G, P2=GND.NET)  # gate noise filter
 
 # ============================================================================
 # Host-5V detection: 2N7002 common-source inverter -> clean 3.3 V logic, ~uA quiescent.
@@ -237,13 +282,13 @@ Capacitor(name="C_RESG",    value="1nF",    package="0402", P1=RES_G,     P2=GND
 # ============================================================================
 _5vg = Net("CPU_5VDET_G")
 Nfet(name="Q_5VDET", D=V5_ABSENT, S=GND.NET, G=_5vg)
-Resistor(name="R_5VDET_G",   value="1kohm",   package="0402", P1=SKT_5V,    P2=_5vg)      # gate <- host 5 V (ESD)
-Resistor(name="R_5VDET_GPD", value="1Mohm",   package="0402", P1=_5vg,      P2=GND.NET)   # FET off when 5 V absent
-Resistor(name="R_5VDET_PU",  value="100kohm", package="0402", P1=V5_ABSENT, P2=P3V3.NET)  # clean 3.3 V high when absent
-Capacitor(name="C_5VDET",    value="100nF",   package="0402", P1=V5_ABSENT, P2=GND.NET)   # debounce
+Resistor(name="R_5VDET_G", value="1kohm", package="0402", P1=SKT_5V, P2=_5vg)  # gate <- host 5 V (ESD)
+Resistor(name="R_5VDET_GPD", value="1Mohm", package="0402", P1=_5vg, P2=GND.NET)  # FET off when 5 V absent
+Resistor(name="R_5VDET_PU", value="100kohm", package="0402", P1=V5_ABSENT, P2=P3V3.NET)  # clean 3.3 V high when absent
+Capacitor(name="C_5VDET", value="100nF", package="0402", P1=V5_ABSENT, P2=GND.NET)  # debounce
 
 # ---- bulk decoupling ----
-Capacitor(name="C_BULK_5V",  value="1uF", package="0603", P1=SKT_5V,   P2=GND.NET)
+Capacitor(name="C_BULK_5V", value="1uF", package="0603", P1=SKT_5V, P2=GND.NET)
 Capacitor(name="C_BULK_3V3", value="1uF", package="0603", P1=P3V3.NET, P2=GND.NET)
 
 # ============================================================================
@@ -253,27 +298,49 @@ Capacitor(name="C_BULK_3V3", value="1uF", package="0603", P1=P3V3.NET, P2=GND.NE
 # ============================================================================
 PinHeader(
     name="J_CPU",
-    pins=20, rows=2, mount="THT", pitch="2.54mm", gender="Male",
-    P1=SKT_O["VPB"],      # DIP1  VPB(CMOS out, driven) / GND(6502; firmware holds VPB low)
-    P2=SKT_I["RDY"],      # DIP2  RDY
-    P3=SKT_P3,            # DIP3  phi1-out(6502) / ABORTB(816) -- flip
-    P4=SKT_I["IRQ"],      # DIP4  /IRQ
-    P5=SKT_O["MLB"],      # DIP5  MLB (NC on 6502)
-    P6=SKT_I["NMI"],      # DIP6  /NMI
-    P7=SKT_O["SYNC_VPA"], # DIP7  SYNC(6502/02) / VPA(816)
-    P8=SKT_5V,            # DIP8  VDD = host 5 V (powers all VCCB)
-    P9=SKT_A[0],  P10=SKT_A[1], P11=SKT_A[2],  P12=SKT_A[3],
-    P13=SKT_A[4], P14=SKT_A[5], P15=SKT_A[6],  P16=SKT_A[7],
-    P17=SKT_A[8], P18=SKT_A[9], P19=SKT_A[10], P20=SKT_A[11],
-    P21=GND,              # DIP21 VSS = ground return to host
-    P22=SKT_A[12], P23=SKT_A[13], P24=SKT_A[14], P25=SKT_A[15],
-    P26=SKT_D[7], P27=SKT_D[6], P28=SKT_D[5], P29=SKT_D[4],
-    P30=SKT_D[3], P31=SKT_D[2], P32=SKT_D[1], P33=SKT_D[0],
-    P34=SKT_O["RW"],        # DIP34 R/W
-    P35=SKT_O["E"],         # DIP35 E (816; NC on 6502/02)
-    P36=SKT_I["BE"],        # DIP36 BE (NC on 6502)
-    P37=SKT_I["PHI2"],      # DIP37 phi0/PHI2 clock in
-    P38=SKT_P38,            # DIP38 SO(6502/02) / MX(816) -- flip
-    P39=SKT_O["PHI2O_VDA"], # DIP39 phi2-out(6502/02) / VDA(816)
-    P40=SKT_I["RES"],       # DIP40 /RES (sensed + deadman-driven)
+    pins=20,
+    rows=2,
+    mount="THT",
+    pitch="2.54mm",
+    gender="Male",
+    P1=SKT_O["VPB"],  # DIP1  VPB(CMOS out, driven) / GND(6502; firmware holds VPB low)
+    P2=SKT_I["RDY"],  # DIP2  RDY
+    P3=SKT_P3,  # DIP3  phi1-out(6502) / ABORTB(816) -- flip
+    P4=SKT_I["IRQ"],  # DIP4  /IRQ
+    P5=SKT_O["MLB"],  # DIP5  MLB (NC on 6502)
+    P6=SKT_I["NMI"],  # DIP6  /NMI
+    P7=SKT_O["SYNC_VPA"],  # DIP7  SYNC(6502/02) / VPA(816)
+    P8=SKT_5V,  # DIP8  VDD = host 5 V (powers all VCCB)
+    P9=SKT_A[0],
+    P10=SKT_A[1],
+    P11=SKT_A[2],
+    P12=SKT_A[3],
+    P13=SKT_A[4],
+    P14=SKT_A[5],
+    P15=SKT_A[6],
+    P16=SKT_A[7],
+    P17=SKT_A[8],
+    P18=SKT_A[9],
+    P19=SKT_A[10],
+    P20=SKT_A[11],
+    P21=GND,  # DIP21 VSS = ground return to host
+    P22=SKT_A[12],
+    P23=SKT_A[13],
+    P24=SKT_A[14],
+    P25=SKT_A[15],
+    P26=SKT_D[7],
+    P27=SKT_D[6],
+    P28=SKT_D[5],
+    P29=SKT_D[4],
+    P30=SKT_D[3],
+    P31=SKT_D[2],
+    P32=SKT_D[1],
+    P33=SKT_D[0],
+    P34=SKT_O["RW"],  # DIP34 R/W
+    P35=SKT_O["E"],  # DIP35 E (816; NC on 6502/02)
+    P36=SKT_I["BE"],  # DIP36 BE (NC on 6502)
+    P37=SKT_I["PHI2"],  # DIP37 phi0/PHI2 clock in
+    P38=SKT_P38,  # DIP38 SO(6502/02) / MX(816) -- flip
+    P39=SKT_O["PHI2O_VDA"],  # DIP39 phi2-out(6502/02) / VDA(816)
+    P40=SKT_I["RES"],  # DIP40 /RES (sensed + deadman-driven)
 )

@@ -12,7 +12,8 @@ board — packed that tight the bodies overlap into mush. So this instead lays e
 block out as a tidy, correctly-spaced cluster (spacing from each footprint's real
 bounding box) in a labeled tray BELOW the board, ordered along the power<->USB
 spine. You then drag each recognizable, labeled cluster onto the board. The
-intended floorplan positions live in docs/board_floorplan.md "Concrete floorplan v1".
+intended floorplan positions live in docs/board_floorplan.md "Concrete floorplan v2"
+(SOM centered; the on-board SOM anchor here uses SOM_DATUM_X = board centre).
 
 Also draws the board outline + finger tab (body = 152.4x69.85 mm rectangle; the
 2.55" tab protrudes ~7.5 mm below, the AppleIIBus_Edge slot J2 filling a gap in
@@ -30,6 +31,7 @@ from collections import defaultdict
 PCB = os.path.join(os.path.dirname(__file__), "..", "layout", "layout.kicad_pcb")
 NET = os.path.join(os.path.dirname(__file__), "..", "layout", "default.net")
 BW, BH = 152.4, 69.85           # card BODY rectangle (mm); tab protrudes below BH
+SOM_DATUM_X = BW / 2            # floorplan-v2: SOM CENTERED (was 55.0, left-of-centre in v1)
 TAB_HALF, TAB_TOP = 32.385, 3.175       # finger-tab half-width + top offset (from footprint)
 TAB_EDGE_GAP = 9.525                    # 0.375" from the tab's RIGHT edge to the card's right edge
 TAB_X = BW - TAB_EDGE_GAP - TAB_HALF     # tab centre -> right side of the card (= 110.49 mm)
@@ -37,8 +39,8 @@ TAB_X = BW - TAB_EDGE_GAP - TAB_HALF     # tab centre -> right side of the card 
 # Blocks in power<->USB spine order, with the label drawn over each tray.
 BLOCKS = [
     ("PWR",       "POWER  (barrel / MP2315 / AMS1117)"),
-    ("SDRAM_UHI", "SDRAM0  (-> C2399)"),
-    ("SDRAM_ULO", "SDRAM1  (-> C2400)"),
+    ("SDRAM_ULO", "SDRAM0 = U_LO / DQ[15:0]  (-> C2399, top)"),
+    ("SDRAM_UHI", "SDRAM1 = U_HI / DQ[31:16] (-> C2400, bottom)"),
     ("SOM",       "SOM DF40 connectors  (CN1=BTB9900 CN2=C2399 CN3=C2400)"),
     ("USB3",      "USB3 / CH569  (+30MHz xtal)"),
     ("PROG",      "FT2232  (JTAG + UART)"),
@@ -163,7 +165,7 @@ def compute():
     # per som_placement.md; CN2/CN3 (100-pin) are horizontal at native rotation.
     som_rot = {"CN1": 270}
     for r, (dx, dy) in {"CN1": (-19.85, 0), "CN2": (-6.47, -14.67), "CN3": (-6.47, 14.74)}.items():
-        place[r] = (55.0 + dx, BH / 2 + dy, som_rot.get(r))
+        place[r] = (SOM_DATUM_X + dx, BH / 2 + dy, som_rot.get(r))
     place["J2"] = (TAB_X, BH + TAB_TOP)          # slot: forms the tab in the outline
     labels.append((30.0, 12.0, "SOM DF40 connectors (on board): CN1=BTB9900 CN2=C2399 CN3=C2400"))
     labels.append((TAB_X - 24, BH - 2, "slot finger tab (mechanical)"))

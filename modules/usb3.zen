@@ -9,83 +9,108 @@ CH569 SSTX -> 100nF AC-couple -> TX1; host RX1 -> CH569 SSRX. TX2/RX2 left NC = 
 orientation-flip (plug correct way up for USB3; USB2 works either way). CC1/CC2 = 5.1k Rd,
 VBUS sensed not drawn (per ch569/README + the CC discussion).
 
-UNWIRED to other modules this round: HSPI (PA*/PB*) + rail nets are local labels.
+WIRED (attempt 2): the 40 HSPI pins (HD0-31 + HTCLK/HRCLK + 6 handshake) are io() ports the
+top maps onto SOM balls near CH569; rails are shared ports. Other CH569 GPIO stay local.
 """
 
-Resistor  = Module("@stdlib/generics/Resistor.zen")
+Resistor = Module("@stdlib/generics/Resistor.zen")
 Capacitor = Module("@stdlib/generics/Capacitor.zen")
-Crystal   = Module("@stdlib/generics/Crystal.zen")
-CH569     = Module("../components/WCH_Jiangsu_Qin_Heng/CH569W/CH569W.zen")
-USBC      = Module("../components/JLCPCB_Assembly/type-c24p/type-c24p.zen")
+Crystal = Module("@stdlib/generics/Crystal.zen")
+CH569 = Module("../components/WCH_Jiangsu_Qin_Heng/CH569W/CH569W.zen")
+USBC = Module("../components/JLCPCB_Assembly/type-c24p/type-c24p.zen")
 
-GND  = Ground()
-P3V3 = Power("P3V3")
-P1V2 = Power("CH_1V2")   # CH569 internal-LDO core rail (V12CORE/V12USB)
+GND = io("GND", Ground)  # shared board ground (top-level owns it)
+P3V3 = io("P3V3", Power)  # shared 3.3V rail from the power module
+P1V2 = Power("CH_1V2")  # CH569 internal-LDO core rail (V12CORE/V12USB) -- local
 
-_XI = Net("CH_XI"); _XO = Net("CH_XO")
-_UDP = Net("USB_CH_DP"); _UDN = Net("USB_CH_DM")
-_CC1 = Net("CH_CC1"); _CC2 = Net("CH_CC2")
-_SSTXA = Net("CH_SSTXP"); _SSTXB = Net("CH_SSTXN")   # CH569 SS TX pair (pre AC-couple)
-_SSRXA = Net("CH_SSRXP"); _SSRXB = Net("CH_SSRXN")   # CH569 SS RX pair
-_TX1P = Net("USB_TX1_P"); _TX1N = Net("USB_TX1_N")   # AC-coupled SS TX to USB-C
+
+# HSPI bus (32 data HD0-31 + 2 clocks HTCLK/HRCLK + 6 handshake) -- the 40 fixed CH569 PA/PB
+# pins are exposed as optional io() PORTS; the top-level maps them onto SOM balls. Non-HSPI
+# CH569 GPIO (PA7/8/12/13/14/15, PB22/23/24) stay local. CH569=HSPI slave, FPGA=master.
+def _hspi(nm):
+    return io(nm, Net, optional=True) or Net(nm)
+
+
+_XI = Net("CH_XI")
+_XO = Net("CH_XO")
+_UDP = Net("USB_CH_DP")
+_UDN = Net("USB_CH_DM")
+_CC1 = Net("CH_CC1")
+_CC2 = Net("CH_CC2")
+_SSTXA = Net("CH_SSTXP")
+_SSTXB = Net("CH_SSTXN")  # CH569 SS TX pair (pre AC-couple)
+_SSRXA = Net("CH_SSRXP")
+_SSRXB = Net("CH_SSRXN")  # CH569 SS RX pair
+_TX1P = Net("USB_TX1_P")
+_TX1N = Net("USB_TX1_N")  # AC-coupled SS TX to USB-C
 
 CH569(
     name="U_CH",
-    PA0=Net("CH_PA0"),
-    PA1=Net("CH_PA1"),
-    PA2=Net("CH_PA2"),
-    PA3=Net("CH_PA3"),
-    PA4=Net("CH_PA4"),
-    PA5=Net("CH_PA5"),
-    PA6=Net("CH_PA6"),
+    PA0=_hspi("CH_PA0"),
+    PA1=_hspi("CH_PA1"),
+    PA2=_hspi("CH_PA2"),
+    PA3=_hspi("CH_PA3"),
+    PA4=_hspi("CH_PA4"),
+    PA5=_hspi("CH_PA5"),
+    PA6=_hspi("CH_PA6"),
     PA7=Net("CH_PA7"),
     PA8=Net("CH_PA8"),
-    PA9=Net("CH_PA9"),
-    PA10=Net("CH_PA10"),
-    PA11=Net("CH_PA11"),
+    PA9=_hspi("CH_PA9"),
+    PA10=_hspi("CH_PA10"),
+    PA11=_hspi("CH_PA11"),
     PA12=Net("CH_PA12"),
     PA13=Net("CH_PA13"),
     PA14=Net("CH_PA14"),
     PA15=Net("CH_PA15"),
-    PA16=Net("CH_PA16"),
-    PA17=Net("CH_PA17"),
-    PA18=Net("CH_PA18"),
-    PA19=Net("CH_PA19"),
-    PA20=Net("CH_PA20"),
-    PA21=Net("CH_PA21"),
-    PA22=Net("CH_PA22"),
-    PA23=Net("CH_PA23"),
-    PB0=Net("CH_PB0"),
-    PB1=Net("CH_PB1"),
-    PB2=Net("CH_PB2"),
-    PB3=Net("CH_PB3"),
-    PB4=Net("CH_PB4"),
-    PB5=Net("CH_PB5"),
-    PB6=Net("CH_PB6"),
-    PB7=Net("CH_PB7"),
-    PB8=Net("CH_PB8"),
-    PB9=Net("CH_PB9"),
-    PB10=Net("CH_PB10"),
-    PB11=Net("CH_PB11"),
-    PB12=Net("CH_PB12"),
-    PB13=Net("CH_PB13"),
-    PB14=Net("CH_PB14"),
-    PB15=Net("CH_PB15"),
-    PB16=Net("CH_PB16"),
-    PB17=Net("CH_PB17"),
-    PB18=Net("CH_PB18"),
-    PB19=Net("CH_PB19"),
-    PB20=Net("CH_PB20"),
-    PB21=Net("CH_PB21"),
+    PA16=_hspi("CH_PA16"),
+    PA17=_hspi("CH_PA17"),
+    PA18=_hspi("CH_PA18"),
+    PA19=_hspi("CH_PA19"),
+    PA20=_hspi("CH_PA20"),
+    PA21=_hspi("CH_PA21"),
+    PA22=_hspi("CH_PA22"),
+    PA23=_hspi("CH_PA23"),
+    PB0=_hspi("CH_PB0"),
+    PB1=_hspi("CH_PB1"),
+    PB2=_hspi("CH_PB2"),
+    PB3=_hspi("CH_PB3"),
+    PB4=_hspi("CH_PB4"),
+    PB5=_hspi("CH_PB5"),
+    PB6=_hspi("CH_PB6"),
+    PB7=_hspi("CH_PB7"),
+    PB8=_hspi("CH_PB8"),
+    PB9=_hspi("CH_PB9"),
+    PB10=_hspi("CH_PB10"),
+    PB11=_hspi("CH_PB11"),
+    PB12=_hspi("CH_PB12"),
+    PB13=_hspi("CH_PB13"),
+    PB14=_hspi("CH_PB14"),
+    PB15=_hspi("CH_PB15"),
+    PB16=_hspi("CH_PB16"),
+    PB17=_hspi("CH_PB17"),
+    PB18=_hspi("CH_PB18"),
+    PB19=_hspi("CH_PB19"),
+    PB20=_hspi("CH_PB20"),
+    PB21=_hspi("CH_PB21"),
     PB22=Net("CH_PB22"),
     PB23=Net("CH_PB23"),
     PB24=Net("CH_PB24"),
-    UD_POS=_UDP, UD_NEG=_UDN,
-    SSTXA=_SSTXA, SSTXB=_SSTXB, SSRXA=_SSRXA, SSRXB=_SSRXB,
-    GXP=Net("CH_GXP"), GXM=Net("CH_GXM"),
-    XI=_XI, XO=_XO,
-    V33LDO=P3V3, V33USB=P3V3, V33GX=P3V3, VDDIO=P3V3,
-    V12CORE=P1V2, V12USB=P1V2,
+    UD_POS=_UDP,
+    UD_NEG=_UDN,
+    SSTXA=_SSTXA,
+    SSTXB=_SSTXB,
+    SSRXA=_SSRXA,
+    SSRXB=_SSRXB,
+    GXP=Net("CH_GXP"),
+    GXM=Net("CH_GXM"),
+    XI=_XI,
+    XO=_XO,
+    V33LDO=P3V3,
+    V33USB=P3V3,
+    V33GX=P3V3,
+    VDDIO=P3V3,
+    V12CORE=P1V2,
+    V12USB=P1V2,
     GND=GND,
 )
 
@@ -94,7 +119,7 @@ Capacitor(name="C_CH_33_1", value="100nF", package="0402", P1=P3V3.NET, P2=GND.N
 Capacitor(name="C_CH_33_2", value="100nF", package="0402", P1=P3V3.NET, P2=GND.NET)
 Capacitor(name="C_CH_33_3", value="100nF", package="0402", P1=P3V3.NET, P2=GND.NET)
 Capacitor(name="C_CH_33_4", value="100nF", package="0402", P1=P3V3.NET, P2=GND.NET)
-Capacitor(name="C_CH_33b", value="4.7uF",  package="0603", P1=P3V3.NET, P2=GND.NET)
+Capacitor(name="C_CH_33b", value="4.7uF", package="0603", P1=P3V3.NET, P2=GND.NET)
 Capacitor(name="C_CH_12_1", value="1uF", package="0402", P1=P1V2.NET, P2=GND.NET)
 Capacitor(name="C_CH_12_2", value="1uF", package="0402", P1=P1V2.NET, P2=GND.NET)
 
@@ -102,9 +127,17 @@ Capacitor(name="C_CH_12_2", value="1uF", package="0402", P1=P1V2.NET, P2=GND.NET
 # Pinned to a real LCSC-stocked part: YXC X322530MSB4SI, 3.2x2.5 4-pad, 30.000MHz, +/-10ppm,
 # CL=20pF (LCSC-native, ~14k stock). Loading caps sized to its 20pF CL: C1=C2=2*(CL-Cstray)
 # = 2*(20 - ~3pF stray) ~= 33pF (was a 12pF placeholder, which targets an ~8pF-CL crystal).
-Crystal  (name="Y_CH", package="3225_4Pin", frequency="30MHz", load_capacitance="20pF",
-          mpn="X322530MSB4SI", manufacturer="YXC Crystal Oscillators",
-          XIN=_XI, XOUT=_XO, GND=GND.NET)
+Crystal(
+    name="Y_CH",
+    package="3225_4Pin",
+    frequency="30MHz",
+    load_capacitance="20pF",
+    mpn="X322530MSB4SI",
+    manufacturer="YXC Crystal Oscillators",
+    XIN=_XI,
+    XOUT=_XO,
+    GND=GND.NET,
+)
 Capacitor(name="C_CH_X1", value="33pF", package="0402", P1=_XI, P2=GND.NET)
 Capacitor(name="C_CH_X2", value="33pF", package="0402", P1=_XO, P2=GND.NET)
 
@@ -113,12 +146,27 @@ Capacitor(name="C_SSTXP", value="100nF", package="0201", P1=_SSTXA, P2=_TX1P)
 Capacitor(name="C_SSTXN", value="100nF", package="0201", P1=_SSTXB, P2=_TX1N)
 
 # USB-C 24-pin (data-only): USB2 on D+/D-, SS pair 1 wired, pair 2 NC (no flip)
-USBC(name="J_USB_CH",
-     D_POS=_UDP, D_NEG=_UDN,
-     TX1_POS=_TX1P, TX1_NEG=_TX1N, RX1_POS=_SSRXA, RX1_NEG=_SSRXB,
-     TX2_POS=Net("CH_TX2P_NC"), TX2_NEG=Net("CH_TX2N_NC"),
-     RX2_POS=Net("CH_RX2P_NC"), RX2_NEG=Net("CH_RX2N_NC"),
-     CC1=_CC1, CC2=_CC2, SUB1=Net("CH_SBU1"), SUB2=Net("CH_SBU2"),
-     VBUS=Net("CH_VBUS_SENSE"), GND=GND.NET, P25=GND.NET, P3=GND.NET, P4=GND.NET)
+USBC(
+    name="J_USB_CH",
+    D_POS=_UDP,
+    D_NEG=_UDN,
+    TX1_POS=_TX1P,
+    TX1_NEG=_TX1N,
+    RX1_POS=_SSRXA,
+    RX1_NEG=_SSRXB,
+    TX2_POS=Net("CH_TX2P_NC"),
+    TX2_NEG=Net("CH_TX2N_NC"),
+    RX2_POS=Net("CH_RX2P_NC"),
+    RX2_NEG=Net("CH_RX2N_NC"),
+    CC1=_CC1,
+    CC2=_CC2,
+    SUB1=Net("CH_SBU1"),
+    SUB2=Net("CH_SBU2"),
+    VBUS=Net("CH_VBUS_SENSE"),
+    GND=GND.NET,
+    P25=GND.NET,
+    P3=GND.NET,
+    P4=GND.NET,
+)
 Resistor(name="R_CH_CC1", value="5.1kohm", package="0402", P1=_CC1, P2=GND.NET)
 Resistor(name="R_CH_CC2", value="5.1kohm", package="0402", P1=_CC2, P2=GND.NET)
