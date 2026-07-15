@@ -375,6 +375,46 @@ escaping toward their loads. `D_IN` (TVS) sits at the P12V node where the bus sp
                       Apple 5V side)          CH569 / FT2232)
 ```
 
+### Input-protection chain placement (jack → `F_IN` → `Q_RP` → `D_IN`)
+
+The chain's internal geometry matters for one reason: **the surge return loop**. When `D_IN`
+clamps, it dumps tens of amps of di/dt into GND, and that current has to get back to the barrel
+jack's **sleeve** pin. Whatever area that loop encloses becomes `V = L·di/dt` injected into the
+board's ground reference — the same reference the SOM and SDRAM use. It is set by geometry, not
+by part choice, and nothing downstream undoes it.
+
+**The plane is what makes `D_IN`-at-the-P12V-split legal.** The stock app-note rule is "put the
+TVS at the connector," and on a 2-layer board it is correct — the return has to crawl back through
+whatever copper happens to exist. Here the solid GND plane under the power block (next section)
+lets the surge return image-follow the outbound trace, so the loop stays tight even with `D_IN`
+at the far end of the chain, clamping the whole bus where it splits to the two `CIN`s. That is
+what buys the arrangement above — but it is **conditional**, and rules 1–2 are the condition.
+
+1. **`D_IN`'s anode vias straight down into the plane** — a small via array at the pad, not a
+   trace running off to a distant via. Same for the **jack's sleeve pin**. Those two pads are the
+   surge loop's endpoints; everything else here is detail.
+2. **The plane between the jack and `D_IN` must be unbroken.** "Don't slot that plane" (stack
+   point 3 below) is usually said about the buck's PGND return; it applies at least as hard to the
+   surge path. A split anywhere under the chain forces the return to detour around it and the loop
+   area you were relying on the plane to keep small comes straight back.
+3. **Physical order = schematic order, one direction, no doubling back:** jack → `F_IN` → `Q_RP` →
+   `D_IN` → P12V out to the `CIN`s, as a straight run *away* from the jack. (The seeder's rough
+   draft currently lands `F_IN` to the *left* of the jack with `Q_RP` back underneath it, so the
+   path reverses on itself — harmless in a draft, worth straightening at real placement.)
+4. **Keep the chain compact.** Length here is inductance in the only path that carries surge
+   current.
+5. **`R_RP`/`R_RP_TOP` hug `Q_RP`'s gate.** The divider midpoint is a ~50 kΩ node sitting next to
+   the highest-di/dt event on the board. Keep the gate trace short and off `D_IN`'s clamp path and
+   the `CIN` hot loops. The seeder already stacks the pair directly above/below `Q_RP`.
+6. **Don't split the chain across faces.** The jack is tall → top face per the design rule above.
+   The chain is all low-profile SMD and *could* go bottom, but every face change adds vias and loop
+   area to the surge path. Keep it on top with the jack.
+7. **Copper.** ~0.68 A nominal (both rails, ~90 % eff), 2.2 A at `F_IN`'s trip point — that alone
+   wants ~1 mm of 1 oz outer — and `D_IN`'s clamp current is tens of amps for microseconds. Pour
+   this path; don't route it at minimum width, and stitch generously at any layer change.
+8. **Mechanical.** Someone will yank the DC cable. Generous annular ring on the jack's
+   through-holes; don't crowd 0402s into the strain path.
+
 ### What the 6-layer stack buys (the 2-layer references can't show this)
 1. **Solid GND plane on the layer directly under the modules** = the return reference; PGND
    current returns straight down, not sideways through a pour. This alone handles most of the
