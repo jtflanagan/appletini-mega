@@ -1,34 +1,36 @@
 """
-power — 12 V barrel-jack input and the on-board rail tree.
+power — 12 V barrel-jack input, input protection, and two integrated-inductor buck modules.
 
 Topology (CARRIER_PLAN "Power delivery"):
-  DC barrel jack, 12 V  ->  MP2315 sync buck -> 5 V (VBUS_SOM + Apple-bus shifter 5V side)
-                        ->  AMS1117-3.3 LDO  -> 3.3 V (VCCIO / logic / CH569 + FT2232H IO)
+  DC barrel jack, 12 V -> PPTC fuse -> reverse-polarity P-FET -> P12V (protected)
+       -> MPM3620A buck -> 5 V   (VBUS_SOM + Apple-bus level-shifter 5 V side)
+       -> MPM3620A buck -> 3.3 V (VCCIO / logic / SDRAM / CH569 / FT2232H IO)
 
-Both USB-C ports are DATA-ONLY; the barrel jack is the sole power input.
+Both rails are SWITCHING (no LDO) so 5->3.3 V isn't burned as heat — the total dissipation
+is roughly halved and spread across two packages, which matters in a poorly-ventilated case.
+Each rail is its own MPM3620A straight off the 12 V rail (independent, not cascaded), lightly
+loaded (~55% / ~28% of 2 A) so they run cool, and the module's 24 V input makes the input
+margin a non-issue. The MPM3620A integrates the inductor + VCC/bootstrap caps, so each rail
+needs only 5 external parts: input cap, output cap, EN pull-up, and a 2-resistor FB divider
+(Vref = 0.8 V). Input PROTECTION stays board-level (the modules don't include it).
 
-UNWIRED to other modules this round: rails are local nets here (P12V/P5V/P3V3) and get
-tied to the SOM/IC modules when we wire. Passive values are sensible starting points.
-
-Input protection: PPTC resettable fuse (overcurrent) + AO3401A P-FET (reverse-polarity) + TVS.
-Barrel jack = LCSC/JLCPCB POWER-JACK (3-terminal). NOTE: its symbol pins are generic (1/2/3);
-mapped by the standard DC-005/044 convention (center=+12V, sleeve=GND, switch=GND) — VERIFY
-pin-to-terminal against the footprint before layout.
+Barrel jack = LCSC/JLCPCB POWER-JACK (3-terminal, DC-005/044 family). Expects a CENTER-POSITIVE
+12V supply — the near-universal convention for barrel supplies (EIAJ RC-5320A), and the polarity
+is called out on F.SilkS next to the jack so it is stated where someone plugging a supply in can
+see it. The pin->terminal mapping (1=center, 2=sleeve, 3=switch) is no longer an assumption: see
+the header of components/JLCPCB_Assembly/POWER-JACK/POWER-JACK.zen for the three independent
+sources it was confirmed against.
 """
 
 Resistor = Module("@stdlib/generics/Resistor.zen")
 Capacitor = Module("@stdlib/generics/Capacitor.zen")
-Inductor = Module("@stdlib/generics/Inductor.zen")
 Tvs = Module("@stdlib/generics/Tvs.zen")
 BarrelJack = Module("../components/JLCPCB_Assembly/POWER-JACK/POWER-JACK.zen")
-Fuse = Module("../components/Bourns_Inc/MF-MSMF110-2/MF-MSMF110-2.zen")  # 1.1A hold PPTC
-Mosfet = Module("../components/ElecSuper/AO3401A/AO3401A.zen")  # P-FET, reverse-polarity
-MP2315 = Module("../components/JLCPCB_Assembly/MP2315/MP2315.zen")
-AMS1117 = Module("../components/Fosan/AMS1117-3_3/AMS1117-3_3.zen")
+Fuse = Module("../components/Bourns_Inc/MF-MSMF110-2/MF-MSMF110-2.zen")   # 1.1A hold PPTC
+Mosfet = Module("../components/ElecSuper/AO3401A/AO3401A.zen")           # P-FET, reverse-polarity
+Buck = Module("../components/Monolithic_Power_Systems_Inc/MPM3620AGQV-Z/MPM3620AGQV-Z.zen")
 
-# Rails are now PORTS (this module SOURCES them for the whole board): the top-level
-# owns the shared GND / P5V / P3V3 nets and passes them in, so power's buck/LDO outputs
-# land on the same nets every other subsystem consumes. P12V is internal (raw input only).
+# Rails are PORTS (this module SOURCES them for the whole board).
 GND = io("GND", Ground)
 P5V = io("P5V", Power)
 P3V3 = io("P3V3", Power)
@@ -38,30 +40,35 @@ P12V = Power("P12V")
 _VIN = Net("VIN_RAW")
 _VIN_F = Net("VIN_FUSED")
 _PGATE = Net("RP_GATE")
-BarrelJack(name="J_PWR", P1=_VIN, P2=GND.NET, P3=GND.NET)  # 1=center/+12V, 2=sleeve/GND, 3=switch->GND (verify)
-Fuse(name="F_IN", P1=_VIN, P2=_VIN_F)  # 1.1A resettable PPTC (overcurrent)
-Mosfet(name="Q_RP", D=_VIN_F, S=P12V, G=_PGATE)  # P-FET reverse-polarity: D=in, S=load, G=in-GND
-Resistor(name="R_RP", value="100kohm", package="0402", P1=_PGATE, P2=GND.NET)  # gate to input return
-Tvs(name="D_IN", package="DO-214AA", K=P12V.NET, A=GND)  # SMB clamp on protected rail
-Capacitor(name="C_IN1", value="10uF", package="1206", P1=P12V.NET, P2=GND.NET)
-Capacitor(name="C_IN2", value="10uF", package="1206", P1=P12V.NET, P2=GND.NET)
+BarrelJack(name="J_PWR", CENTER=_VIN, SLEEVE=GND.NET, SWITCH=GND.NET)   # center-positive 12V in
+Fuse(name="F_IN", P1=_VIN, P2=_VIN_F)                       # 1.1A resettable PPTC (overcurrent)
+Mosfet(name="Q_RP", D=_VIN_F, S=P12V.NET, G=_PGATE)         # P-FET reverse-polarity: D=in, S=load
+# Gate divider, NOT a bare pulldown: AO3401A Vgs max is ±12V, so tying the gate straight to GND
+# runs Vgs = -12V AT the limit in normal operation, and -19.9V when D_IN clamps. 100k/100k gives
+# Vgs = -Vs/2: -6V nominal (Rds(on) 45mΩ vs 42mΩ — Vgs(th) is only -1.1V, the drive is ample) and
+# -9.95V at a 19.9V clamp. The top leg MUST tie to the SOURCE: tied to _VIN_F, a reversed input
+# would sit the gate at -6V against a ~0V source and turn the FET ON, defeating the protection.
+Resistor(name="R_RP_TOP", value="100kohm", package="0402", P1=P12V.NET, P2=_PGATE)
+Resistor(name="R_RP", value="100kohm", package="0402", P1=_PGATE, P2=GND.NET)
+# SMBJ12A (house part): 12V standoff, 19.9V clamp — the only house TVS whose clamp stays under
+# the modules' 24V max (the catalog jumps 12V->20V, and 20V+ clamps too high). 12V standoff is
+# fine on a REGULATED 12V rail (µA leakage, no hot-plug). If the supply ever idles >~12.6V, swap
+# to a dedicated 13V part (SMBJ13A, clamp 21.5V) — the Tvs generic won't carry a custom MPN here.
+Tvs(name="D_IN", package="DO-214AA", reverse_standoff_voltage="12V", K=P12V.NET, A=GND)
 
-# ---- 12V -> 5V : MP2315 synchronous buck ----
-_SW = Net("PWR_SW")
-_BST = Net("PWR_BST")
-_FB5 = Net("PWR_FB5")
-_VCC = Net("PWR_VCC")
-_AAM = Net("PWR_AAM")
-MP2315(name="U_BUCK", IN=P12V, SW=_SW, GND=GND, FB=_FB5, EN=P12V, BST=_BST, VCC=_VCC, AAM=_AAM)
-Inductor(name="L_BUCK", value="2.2uH", package="1210", P1=_SW, P2=P5V.NET)
-Capacitor(name="C_BST", value="100nF", package="0402", P1=_SW, P2=_BST)
-Capacitor(name="C_VCC", value="1uF", package="0402", P1=_VCC, P2=GND.NET)
-Resistor(name="R_FB1", value="52.3kohm", package="0402", P1=P5V.NET, P2=_FB5)  # 5V from 0.8V ref
-Resistor(name="R_FB2", value="10kohm", package="0402", P1=_FB5, P2=GND.NET)
-Capacitor(name="C_O5A", value="22uF", package="0805", P1=P5V.NET, P2=GND.NET)
-Capacitor(name="C_O5B", value="22uF", package="0805", P1=P5V.NET, P2=GND.NET)
+# ---- one MPM3620A rail: integrated-inductor buck, 5 external parts (Vref = 0.8 V) ----
+def rail(name, vout, r_top, r_bot):
+    en = Net(name + "_EN")
+    fb = Net(name + "_FB")
+    # SW/BST/VCC/PG/NC are internal or optional -> each on its own (unconnected) net
+    Buck(name=name, IN=P12V.NET, OUT=vout, FB=fb, EN=en, AGND=GND.NET, PGND=GND.NET,
+         SW=Net(name + "_SW"), BST=Net(name + "_BST"), VCC=Net(name + "_VCC"),
+         PG=Net(name + "_PG"), NC=Net(name + "_NC"))
+    Resistor(name=name + "_REN", value="100kohm", package="0402", P1=en, P2=P12V.NET)   # EN pull-up to VIN
+    Capacitor(name=name + "_CIN", value="10uF", voltage="25V", package="0805", P1=P12V.NET, P2=GND.NET)
+    Capacitor(name=name + "_COUT", value="22uF", voltage="10V", package="0805", P1=vout, P2=GND.NET)
+    Resistor(name=name + "_RTOP", value=r_top, package="0402", P1=vout, P2=fb)
+    Resistor(name=name + "_RBOT", value=r_bot, package="0402", P1=fb, P2=GND.NET)
 
-# ---- 5V -> 3.3V : AMS1117-3.3 LDO ----
-AMS1117(name="U_LDO", VIN=P5V, VOUT=P3V3, VSS=GND)
-Capacitor(name="C_LDO_I", value="10uF", package="0805", P1=P5V.NET, P2=GND.NET)
-Capacitor(name="C_LDO_O", value="22uF", package="0805", P1=P3V3.NET, P2=GND.NET)
+rail("U_BUCK5", P5V.NET, "105kohm", "20kohm")     # 12V -> 5.00V  (0.8 * (1 + 105/20))
+rail("U_BUCK33", P3V3.NET, "75kohm", "24kohm")    # 12V -> 3.30V  (0.8 * (1 + 75/24)); datasheet divider

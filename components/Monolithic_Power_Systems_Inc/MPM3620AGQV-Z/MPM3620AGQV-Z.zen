@@ -1,0 +1,35 @@
+"""
+MPM3620AGQV-Z
+
+Auto-generated using `pcb search`.
+"""
+
+AGND = io(Net)
+BST = io(Net)
+EN = io(Net)
+FB = io(Net)
+IN = io(Net)
+NC = io(Net)
+OUT = io(Net)
+PG = io(Net)
+PGND = io(Net)
+SW = io(Net)
+VCC = io(Net)
+
+Component(
+    name="MPM3620AGQV-Z",
+    symbol=Symbol(library="MPM3620AGQV-Z.kicad_sym"),
+    pins={
+        "AGND": AGND,
+        "BST": BST,
+        "EN": EN,
+        "FB": FB,
+        "IN": IN,
+        "NC": NC,
+        "OUT": OUT,
+        "PG": PG,
+        "PGND": PGND,
+        "SW": SW,
+        "VCC": VCC,
+    },
+)

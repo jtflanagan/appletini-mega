@@ -1,5 +1,5 @@
 """
-sdram — 32-bit-wide SDR SDRAM (soft-CPU FETCH path), two INDEPENDENT 16-bit devices.
+sdram — one 32-bit-wide SDR SDRAM bank teamed from two x16 devices on a SHARED bus.
 
 Two AS4C16M16SA-7TCN (256Mbit, 16Mx16, 143MHz, 54-pin TSOP-II) SDR SDRAMs. JEDEC-standard
 256Mbit x16 SDR SDRAM, LCSC-stocked with a verified ECAD model — chosen over the originally-
@@ -7,14 +7,20 @@ planned Winbond W9825G6KH (JEDEC-identical, but no LCSC model). PACKAGE = TSOP, 
 (-7BCN) variant: same die/pinout/timing, but the board is not space-constrained, so TSOP wins
 on routing (perimeter escape, no BGA vias), JLCPCB assembly cost/risk, price, and stock — and
 it makes the open ULX3S / MiSTer SDRAM layouts directly usable as routing references.
-Each device is wired as its OWN point-to-point bus (independent address/BA/command/
-clock) rather than a shared bus: the two 16-bit halves land on separate DF40 connectors
-(C2399 BANK1/2 vs C2400 BANK6/7/8), so independent routing keeps each bus bank-local and
-point-to-point (see CARRIER_PLAN + the routing discussion). Data forms the 32-bit word:
-U_LO=DQ[15:0], U_HI=DQ[31:16].
 
-WIRED (attempt 1): every FPGA-side signal is a REQUIRED io() port; the top-level connects
-them to the SOM balls (SDRAM0/U_LO -> C2399 BANK1/2, SDRAM1/U_HI -> C2400 BANK6/7/8). The
+The two devices are teamed into ONE 32-bit-wide bank the standard way: every command/clock/
+address signal (CLK, CKE, A[12:0], BA[1:0], N_CS, N_RAS, N_CAS, N_WE) is a SINGLE net that
+fans out to BOTH devices, so they operate in lockstep. Only the data buses and the byte
+masks are independent — U_LO carries DQ[15:0], U_HI carries DQ[31:16], and the four DQM
+lines (DQM0..DQM3) are the per-byte-lane write enables of the 32-bit word:
+    DQM0 = U_LO/LDQM -> DQ[7:0]     DQM2 = U_HI/LDQM -> DQ[23:16]
+    DQM1 = U_LO/UDQM -> DQ[15:8]    DQM3 = U_HI/UDQM -> DQ[31:24]
+This is a shared (not point-to-point) bus: the shared command/address nets span from the
+FPGA out to both devices (which sit on separate DF40 connectors — U_LO BANK1/2, U_HI
+BANK6/7/8), so those nets are routed as a fly-by/T bus, not bank-local point-to-point.
+
+WIRED: every FPGA-side signal is a REQUIRED io() port; the top-level connects them to the
+SOM balls (one ball per shared signal; independent balls for the 32 DQ + 4 DQM). The
 signal<->ball pairing is a bank-correct starting map, re-optimised for escape at P&R time.
 """
 
@@ -22,122 +28,42 @@ SDRAM = Module("../components/Alliance_Memory/AS4C16M16SA-7TCN/AS4C16M16SA-7TCN.
 Capacitor = Module("@stdlib/generics/Capacitor.zen")
 
 # ---- ports: the top-level owns the rails + the FPGA-side signal nets and connects them
-# to the SOM balls. Both devices are fully wired this round, so these are REQUIRED io()
-# ports -- a forgotten connection errors at build time rather than silently floating.
+# to the SOM balls. Every port is REQUIRED io() -- a forgotten connection errors at build
+# time rather than silently floating.
 VDD = io("VDD", Power)  # 3.3V (top passes the shared P3V3)
 GND = io("GND", Ground)
 
-# per-device address/command/clock signals (SOM-side nets, supplied by the parent)
+# shared command/clock/address -- ONE net per signal, driven to BOTH devices (32-bit lockstep)
 _ADDR = ["A%d" % i for i in range(13)]
-_CTL = ["BA0", "BA1", "CLK", "CKE", "N_CS", "N_RAS", "N_CAS", "N_WE", "LDQM", "UDQM"]
-_SIG = _ADDR + _CTL
-ULO = {s: io("ULO_" + s, Net) for s in _SIG}
-UHI = {s: io("UHI_" + s, Net) for s in _SIG}
-# data: ULO carries word bits DQ[15:0], UHI carries DQ[31:16] (assembled in the FPGA)
+_SHARED = _ADDR + ["BA0", "BA1", "CLK", "CKE", "N_CS", "N_RAS", "N_CAS", "N_WE"]
+SH = {s: io(s, Net) for s in _SHARED}
+
+# per-byte write enables: DQM0..DQM3 mask the four byte lanes of the 32-bit word (independent)
+DQM = [io("DQM%d" % i, Net) for i in range(4)]
+
+# data: U_LO carries word bits DQ[15:0], U_HI carries DQ[31:16] (assembled in the FPGA)
 ULO_DQ = [io("ULO_DQ%d" % i, Net) for i in range(16)]
 UHI_DQ = [io("UHI_DQ%d" % i, Net) for i in range(16)]
 
-# ===== U_LO — low 16 bits, DQ[15:0]  (independent bus A) =====
-SDRAM(
-    name="ULO",
-    A0=ULO["A0"],
-    A1=ULO["A1"],
-    A2=ULO["A2"],
-    A3=ULO["A3"],
-    A4=ULO["A4"],
-    A5=ULO["A5"],
-    A6=ULO["A6"],
-    A7=ULO["A7"],
-    A8=ULO["A8"],
-    A9=ULO["A9"],
-    A10=ULO["A10"],
-    A11=ULO["A11"],
-    A12=ULO["A12"],
-    BA0=ULO["BA0"],
-    BA1=ULO["BA1"],
-    CLK=ULO["CLK"],
-    CKE=ULO["CKE"],
-    N_CS=ULO["N_CS"],
-    N_RAS=ULO["N_RAS"],
-    N_CAS=ULO["N_CAS"],
-    N_WE=ULO["N_WE"],
-    LDQM=ULO["LDQM"],
-    UDQM=ULO["UDQM"],
-    DQ0=ULO_DQ[0],
-    DQ1=ULO_DQ[1],
-    DQ2=ULO_DQ[2],
-    DQ3=ULO_DQ[3],
-    DQ4=ULO_DQ[4],
-    DQ5=ULO_DQ[5],
-    DQ6=ULO_DQ[6],
-    DQ7=ULO_DQ[7],
-    DQ8=ULO_DQ[8],
-    DQ9=ULO_DQ[9],
-    DQ10=ULO_DQ[10],
-    DQ11=ULO_DQ[11],
-    DQ12=ULO_DQ[12],
-    DQ13=ULO_DQ[13],
-    DQ14=ULO_DQ[14],
-    DQ15=ULO_DQ[15],
-    VDD=VDD,
-    VDDQ=VDD,
-    VSS=GND,
-    VSSQ=GND,
-    NC=Net("SDRAM_ULO_NC"),
-)
+# the shared command/clock/address + rail connections -- identical on both devices
+_shared_kw = {s: SH[s] for s in _SHARED}
+_shared_kw.update({"VDD": VDD, "VDDQ": VDD, "VSS": GND, "VSSQ": GND})
+
+# ===== U_LO — low 16 bits, DQ[15:0]; byte lanes DQM0 (low) / DQM1 (high) =====
+_ulo_kw = {"LDQM": DQM[0], "UDQM": DQM[1], "NC": Net("SDRAM_ULO_NC")}
+_ulo_kw.update(_shared_kw)
+_ulo_kw.update({"DQ%d" % i: ULO_DQ[i] for i in range(16)})
+SDRAM(name="ULO", **_ulo_kw)
 Capacitor(name="C_ULO_1", value="100nF", package="0402", P1=VDD.NET, P2=GND.NET)
 Capacitor(name="C_ULO_2", value="100nF", package="0402", P1=VDD.NET, P2=GND.NET)
 Capacitor(name="C_ULO_3", value="100nF", package="0402", P1=VDD.NET, P2=GND.NET)
 Capacitor(name="C_ULO_4", value="100nF", package="0402", P1=VDD.NET, P2=GND.NET)
 
-# ===== U_HI — high 16 bits, DQ[31:16] (independent bus B) =====
-SDRAM(
-    name="UHI",
-    A0=UHI["A0"],
-    A1=UHI["A1"],
-    A2=UHI["A2"],
-    A3=UHI["A3"],
-    A4=UHI["A4"],
-    A5=UHI["A5"],
-    A6=UHI["A6"],
-    A7=UHI["A7"],
-    A8=UHI["A8"],
-    A9=UHI["A9"],
-    A10=UHI["A10"],
-    A11=UHI["A11"],
-    A12=UHI["A12"],
-    BA0=UHI["BA0"],
-    BA1=UHI["BA1"],
-    CLK=UHI["CLK"],
-    CKE=UHI["CKE"],
-    N_CS=UHI["N_CS"],
-    N_RAS=UHI["N_RAS"],
-    N_CAS=UHI["N_CAS"],
-    N_WE=UHI["N_WE"],
-    LDQM=UHI["LDQM"],
-    UDQM=UHI["UDQM"],
-    DQ0=UHI_DQ[0],
-    DQ1=UHI_DQ[1],
-    DQ2=UHI_DQ[2],
-    DQ3=UHI_DQ[3],
-    DQ4=UHI_DQ[4],
-    DQ5=UHI_DQ[5],
-    DQ6=UHI_DQ[6],
-    DQ7=UHI_DQ[7],
-    DQ8=UHI_DQ[8],
-    DQ9=UHI_DQ[9],
-    DQ10=UHI_DQ[10],
-    DQ11=UHI_DQ[11],
-    DQ12=UHI_DQ[12],
-    DQ13=UHI_DQ[13],
-    DQ14=UHI_DQ[14],
-    DQ15=UHI_DQ[15],
-    VDD=VDD,
-    VDDQ=VDD,
-    VSS=GND,
-    VSSQ=GND,
-    NC=Net("SDRAM_UHI_NC"),
-)
+# ===== U_HI — high 16 bits, DQ[31:16]; byte lanes DQM2 (low) / DQM3 (high) =====
+_uhi_kw = {"LDQM": DQM[2], "UDQM": DQM[3], "NC": Net("SDRAM_UHI_NC")}
+_uhi_kw.update(_shared_kw)
+_uhi_kw.update({"DQ%d" % i: UHI_DQ[i] for i in range(16)})
+SDRAM(name="UHI", **_uhi_kw)
 Capacitor(name="C_UHI_1", value="100nF", package="0402", P1=VDD.NET, P2=GND.NET)
 Capacitor(name="C_UHI_2", value="100nF", package="0402", P1=VDD.NET, P2=GND.NET)
 Capacitor(name="C_UHI_3", value="100nF", package="0402", P1=VDD.NET, P2=GND.NET)

@@ -5,7 +5,8 @@ Top-level board. WIRING (2026-07-09): all subsystems joined; every functional bu
 the SOM balls. Done here, in order:
   * RAILS: one shared GND + P5V + P3V3, owned here and passed into every module's rail io()
     ports (the modules used to each declare private GND/P3V3 nets that never joined).
-  * SDRAM (fetch path): SDRAM0 (U_LO, DQ[15:0]) -> C2399, SDRAM1 (U_HI, DQ[31:16]) -> C2400.
+  * SDRAM (fetch path): one 32-bit bank teamed from U_LO (DQ[15:0], C2399) + U_HI (DQ[31:16],
+    C2400) on a SHARED command/clock/address bus; 4 independent DQM byte write enables.
   * HSPI: CH569 (slave) <-> FPGA (master), 32 data + 2 clocks + 6 handshake, near CH569.
   * Apple bus: cpu_socket A-side (16A + 8D + status/flip + control) <-> SOM.
   * JTAG/UART: FT2232 ch.A -> SOM BANK12 config balls; ch.B UART console.
@@ -21,11 +22,23 @@ is the connectivity (which chip pin reaches a SOM ball, on which rails).
 Subsystems:
   - som_btb      Tang Mega 60K SOM board-to-board (DF40) connectors + all labeled pins
   - power        12 V barrel -> buck 5 V (VBUS_SOM) -> 3.3 V (VCCIO / logic / IC rails)
-  - sdram        2x AS4C16M16SA 16-bit SDR, wired as one 32-bit-wide bus (fetch path)
+  - sdram        2x AS4C16M16SA x16 SDR teamed as one 32-bit bank on a shared bus (fetch path)
   - programming  FT2232H (ch.A = JTAG/MPSSE, ch.B = UART console) + 12 MHz xtal + USB-C
   - usb3         WCH CH569 HSPI<->USB3 SuperSpeed bridge + 30 MHz xtal + USB3 connector
   - cpu_socket   6502/65816 CPU-socket bus interface (LXC level shifters + deadman reset)
 """
+
+# JLCPCB design-rule override records (Board itself is injected; these are not)
+load(
+    "@stdlib/board_config.zen",
+    "BoardConfig",
+    "DesignRules",
+    "Constraints",
+    "Copper",
+    "Holes",
+    "Silkscreen",
+    "SolderMask",
+)
 
 SomBtb = Module("modules/som_btb.zen")
 PowerMod = Module("modules/power.zen")  # not 'Power' -- that's the builtin net constructor
@@ -35,10 +48,52 @@ Usb3Bridge = Module("modules/usb3.zen")
 CpuSocket = Module("modules/cpu_socket.zen")
 Mechanical = Module("modules/mechanical.zen")
 
+# ============================================================================
+# Manufacturing target = JLCPCB, 6-layer, 1oz outer / 0.5oz inner, 1.6 mm, ENIG.
+# `layers=6` supplies the base stackup + impedance netclasses + predefined sizes; the
+# `config=` below PINS JLCPCB's published 6-layer / 1oz capability so KiCad DRC is a real
+# manufacturability gate and the intent is source-controlled (not silently inherited from
+# a toolchain default that could drift). Numbers from JLCPCB "PCB Capabilities" (6-layer,
+# 1oz), retrieved 2026-07-10:
+#   min trace / space ........ 0.09 / 0.09 mm (3.5 mil)   -- enables the 0.4 mm DF40 escape
+#   min via .................. 0.25 mm pad / 0.15 mm drill (netclass default is 0.5/0.3)
+#   via hole -> copper ....... 0.20 mm      hole-to-hole ..... 0.20 mm (via)
+#   copper -> board edge ..... 0.30 mm
+#   silkscreen ............... >= 0.15 mm line clearance, >= 0.8 mm text (legible floor)
+#   solder-mask dam .......... 0.10 mm (guaranteed on GREEN mask; black/white need ~0.15)
+# NOTE: the impedance netclasses (50R SE / 85-100R diff) inherited from the layers=6 base
+# are computed on a GENERIC FR-4 stackup -- re-derive those track widths with JLCPCB's
+# impedance calculator against the exact ordered 6-layer stackup before release.
+# ============================================================================
 Board(
     name="appletini-mega",
     layout_path="layout",
     layers=6,  # dense 0.4mm DF40 escape (3 conns) + two 32-bit buses + USB3 SS; 4 layers too tight
+    solder_mask_color="Green",  # JLC guarantees the finest 0.10 mm mask dam on green (see below)
+    config=BoardConfig(
+        design_rules=DesignRules(
+            constraints=Constraints(
+                copper=Copper(
+                    minimum_clearance=0.09,  # JLC 6L/1oz min space
+                    minimum_track_width=0.09,  # JLC 6L/1oz min trace
+                    minimum_via_diameter=0.25,  # JLC min via pad (0.15 mm drill)
+                    copper_to_hole_clearance=0.2,  # JLC via-hole -> copper
+                    copper_to_edge_clearance=0.3,  # JLC copper -> routed edge
+                ),
+                holes=Holes(
+                    minimum_through_hole=0.15,  # JLC min drilled hole
+                    hole_to_hole_clearance=0.2,  # JLC via-to-via
+                ),
+                silkscreen=Silkscreen(
+                    minimum_item_clearance=0.15,  # JLC min silk line/clearance
+                    minimum_text_height=0.8,  # JLC legible-silk floor (>0.6 base)
+                ),
+                solder_mask=SolderMask(
+                    minimum_width=0.1,  # JLC min mask dam on green mask
+                ),
+            ),
+        ),
+    ),
 )
 
 # ============================================================================
@@ -53,8 +108,15 @@ P3V3 = Power("P3V3")  # 3.3V (LDO output) -> logic + VCCIO + IC rails
 # SDRAM pilot wiring: (sdram_port, som_ball, functional_net) triples.
 # One Net per functional name, passed to BOTH the SDRAM device port and the SOM ball port
 # so the two module-local nodes become the SAME physical net.
+#
+# 32-bit bank teamed from two x16 devices on a SHARED bus: the command/clock/address signals
+# (A[12:0], BA[1:0], CLK, CKE, N_CS, N_RAS, N_CAS, N_WE) are ONE net each, sourced from a
+# single SOM ball and fanned out to both devices (U_LO's BANK1/2 balls carry them). Only the
+# 32 DQ bits and the 4 byte-write-enable masks (DQM0..3, one per byte lane) are independent.
+# U_HI's former command/address balls are freed by the sharing and left unassigned here.
 # ============================================================================
 _SDRAM_MAP = [
+    # ---- data: U_LO = DQ[15:0], U_HI = DQ[31:16] (independent) ----
     ("ULO_DQ0", "SOM_E17", "SDRAM_DQ0"),
     ("ULO_DQ1", "SOM_B18", "SDRAM_DQ1"),
     ("ULO_DQ2", "SOM_F16", "SDRAM_DQ2"),
@@ -71,29 +133,6 @@ _SDRAM_MAP = [
     ("ULO_DQ13", "SOM_B16", "SDRAM_DQ13"),
     ("ULO_DQ14", "SOM_F14", "SDRAM_DQ14"),
     ("ULO_DQ15", "SOM_B15", "SDRAM_DQ15"),
-    ("ULO_A0", "SOM_F13", "SDRAM0_A0"),
-    ("ULO_A1", "SOM_A14", "SDRAM0_A1"),
-    ("ULO_A2", "SOM_A13", "SDRAM0_A2"),
-    ("ULO_A3", "SOM_B13", "SDRAM0_A3"),
-    ("ULO_A4", "SOM_C13", "SDRAM0_A4"),
-    ("ULO_A5", "SOM_C15", "SDRAM0_A5"),
-    ("ULO_A6", "SOM_C14", "SDRAM0_A6"),
-    ("ULO_A7", "SOM_E14", "SDRAM0_A7"),
-    ("ULO_A8", "SOM_E13", "SDRAM0_A8"),
-    ("ULO_A9", "SOM_C20", "SDRAM0_A9"),
-    ("ULO_A10", "SOM_A21", "SDRAM0_A10"),
-    ("ULO_A11", "SOM_D20", "SDRAM0_A11"),
-    ("ULO_A12", "SOM_B21", "SDRAM0_A12"),
-    ("ULO_BA0", "SOM_D19", "SDRAM0_BA0"),
-    ("ULO_BA1", "SOM_A20", "SDRAM0_BA1"),
-    ("ULO_N_CS", "SOM_E19", "SDRAM0_NCS"),
-    ("ULO_N_RAS", "SOM_B20", "SDRAM0_NRAS"),
-    ("ULO_N_CAS", "SOM_C19", "SDRAM0_NCAS"),
-    ("ULO_N_WE", "SOM_A19", "SDRAM0_NWE"),
-    ("ULO_CLK", "SOM_C18", "SDRAM0_CLK"),
-    ("ULO_CKE", "SOM_A18", "SDRAM0_CKE"),
-    ("ULO_LDQM", "SOM_H15", "SDRAM0_LDQM"),
-    ("ULO_UDQM", "SOM_J15", "SDRAM0_UDQM"),
     ("UHI_DQ0", "SOM_P17", "SDRAM_DQ16"),
     ("UHI_DQ1", "SOM_N17", "SDRAM_DQ17"),
     ("UHI_DQ2", "SOM_N15", "SDRAM_DQ18"),
@@ -110,29 +149,33 @@ _SDRAM_MAP = [
     ("UHI_DQ13", "SOM_T14", "SDRAM_DQ29"),
     ("UHI_DQ14", "SOM_W22", "SDRAM_DQ30"),
     ("UHI_DQ15", "SOM_W21", "SDRAM_DQ31"),
-    ("UHI_A0", "SOM_AA21", "SDRAM1_A0"),
-    ("UHI_A1", "SOM_AA20", "SDRAM1_A1"),
-    ("UHI_A2", "SOM_Y17", "SDRAM1_A2"),
-    ("UHI_A3", "SOM_AB17", "SDRAM1_A3"),
-    ("UHI_A4", "SOM_AA16", "SDRAM1_A4"),
-    ("UHI_A5", "SOM_AB16", "SDRAM1_A5"),
-    ("UHI_A6", "SOM_AA15", "SDRAM1_A6"),
-    ("UHI_A7", "SOM_W16", "SDRAM1_A7"),
-    ("UHI_A8", "SOM_Y16", "SDRAM1_A8"),
-    ("UHI_A9", "SOM_W15", "SDRAM1_A9"),
-    ("UHI_A10", "SOM_V13", "SDRAM1_A10"),
-    ("UHI_A11", "SOM_Y22", "SDRAM1_A11"),
-    ("UHI_A12", "SOM_Y21", "SDRAM1_A12"),
-    ("UHI_BA0", "SOM_V20", "SDRAM1_BA0"),
-    ("UHI_BA1", "SOM_AB22", "SDRAM1_BA1"),
-    ("UHI_N_CS", "SOM_U20", "SDRAM1_NCS"),
-    ("UHI_N_RAS", "SOM_AB21", "SDRAM1_NRAS"),
-    ("UHI_N_CAS", "SOM_AB20", "SDRAM1_NCAS"),
-    ("UHI_N_WE", "SOM_AA19", "SDRAM1_NWE"),
-    ("UHI_CLK", "SOM_W20", "SDRAM1_CLK"),
-    ("UHI_CKE", "SOM_W19", "SDRAM1_CKE"),
-    ("UHI_LDQM", "SOM_AB18", "SDRAM1_LDQM"),
-    ("UHI_UDQM", "SOM_AA18", "SDRAM1_UDQM"),
+    # ---- byte write enables: DQM0/1 mask U_LO's lanes, DQM2/3 mask U_HI's (independent) ----
+    ("DQM0", "SOM_H15", "SDRAM_DQM0"),  # U_LO LDQM -> DQ[7:0]
+    ("DQM1", "SOM_J15", "SDRAM_DQM1"),  # U_LO UDQM -> DQ[15:8]
+    ("DQM2", "SOM_AB18", "SDRAM_DQM2"),  # U_HI LDQM -> DQ[23:16]
+    ("DQM3", "SOM_AA18", "SDRAM_DQM3"),  # U_HI UDQM -> DQ[31:24]
+    # ---- shared command/clock/address: one ball each, fanned to BOTH devices ----
+    ("A0", "SOM_F13", "SDRAM_A0"),
+    ("A1", "SOM_A14", "SDRAM_A1"),
+    ("A2", "SOM_A13", "SDRAM_A2"),
+    ("A3", "SOM_B13", "SDRAM_A3"),
+    ("A4", "SOM_C13", "SDRAM_A4"),
+    ("A5", "SOM_C15", "SDRAM_A5"),
+    ("A6", "SOM_C14", "SDRAM_A6"),
+    ("A7", "SOM_E14", "SDRAM_A7"),
+    ("A8", "SOM_E13", "SDRAM_A8"),
+    ("A9", "SOM_C20", "SDRAM_A9"),
+    ("A10", "SOM_A21", "SDRAM_A10"),
+    ("A11", "SOM_D20", "SDRAM_A11"),
+    ("A12", "SOM_B21", "SDRAM_A12"),
+    ("BA0", "SOM_D19", "SDRAM_BA0"),
+    ("BA1", "SOM_A20", "SDRAM_BA1"),
+    ("N_CS", "SOM_E19", "SDRAM_NCS"),
+    ("N_RAS", "SOM_B20", "SDRAM_NRAS"),
+    ("N_CAS", "SOM_C19", "SDRAM_NCAS"),
+    ("N_WE", "SOM_A19", "SDRAM_NWE"),
+    ("CLK", "SOM_C18", "SDRAM_CLK"),
+    ("CKE", "SOM_A18", "SDRAM_CKE"),
 ]
 _snets = {nn: Net(nn) for (_sp, _sb, nn) in _SDRAM_MAP}
 _sdram_kw = {sp: _snets[nn] for (sp, _sb, nn) in _SDRAM_MAP}

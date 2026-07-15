@@ -207,15 +207,25 @@ relative to each connector body centre:
 
 | Conn | dock pin-1 | our footprint pin-1 (native) | verdict |
 |---|---|---|---|
-| **80-pin** (BTB9900) | (−1.54, −7.8) @ 270° → left-top | native (−7.8, +1.32) = left | **footprint OK** |
+| **80-pin** (BTB9900) | (−1.54, −7.8) @ 270° → left-top | native (−7.8, +1.32) = left | **pin-1 corner OK** |
 | **100-pin** (C2399/C2400) | (−9.8, +1.54) = **left**/+y | (+9.8, +1.6) = **right**/+y | **mirror-numbered — FIXED** |
 
-The 100-pin was a pure left–right mirror (U-shape scheme, pins 1–50 / 51–100 preserved). **Fix
-(applied to the `.kicad_mod`):** renumber pads `n→51−n` (top row) / `n→151−n` (bottom row) and mirror
-the pin-1 silk dot to the left. `btb_som_pinmap.md`/`som_btb.zen` use the real Hirose contact numbering
-(transcribed from the SOM+dock schematics), so correcting the footprint makes the existing net→pad
-map physically correct — **no `.zen`/pinmap change needed.** Verified: all three pin-1s now land on
-their `som_placement` targets within 0.25 mm.
+The 100-pin pin-1 corner was a pure left–right mirror; fixed to the left/+y corner (matches the dock).
+
+**Zigzag numbering fix (2026-07-11 — both footprints).** After the mirror fix the pads were still
+numbered in a **serpentine / U-shape** order (top row 1→N/2 left-to-right, bottom row N→N/2+1 back
+left-to-right). That is wrong for DF40: the real part is an **aligned zigzag** — **odd pins (1,3,5…)
+along one row, even pins (2,4,6…) along the other, with pin 1 and pin 2 facing each other** at the
+left end (datasheet Note 4: non-polarized; 0.4 mm pitch, B = 19.6/15.6 mm ⇒ 50/40 pads per row,
+rows column-aligned). **Fix (applied to both `.kicad_mod`, `tools/floorplan_seed.py` untouched):**
+for column `k` (0 = leftmost, pitch 0.4 mm), top-row pad = `2k+1`, bottom-row pad = `2k+2`. Pin 1
+does not move (stays left/+y), so the pin-1 silk dot is unchanged. `btb_som_pinmap.md`/`som_btb.zen`
+use the real Hirose contact numbering, so correcting the footprint makes the existing net→pad map
+physically correct — **no `.zen`/pinmap change needed.**
+
+⚠ **This is a footprint-body edit** — a plain `pcb layout` sync will NOT pull it (bodies are
+preserved across regen). Close KiCad, then `rm -rf layout && pcb layout appletini_mega.zen --no-open
+&& python3 tools/floorplan_seed.py` for a clean regen.
 
 **Placement rotations (in `tools/floorplan_seed.py`):** CN1 (BTB9900) = **270°**, CN2 (C2399) /
 CN3 (C2400) = **0°**. ⚠ **The pcb/KiCad layout pipeline rotates pad POSITIONS by the footprint

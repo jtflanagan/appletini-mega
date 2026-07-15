@@ -1,15 +1,29 @@
 """
-POWER-JACK
+POWER-JACK — LCSC/JLCPCB C9900001795, DC-005/DC-044 family barrel jack (3-terminal).
 
-Auto-generated using `pcb search`.
+Auto-generated using `pcb search`; the pin NAMES below are hand-added. The generated symbol
+numbers its pins 1/2/3 with no terminal semantics, so the mapping was established from three
+independent sources (2026-07-14):
+
+  1. This footprint's pad geometry is an exact, non-mirrored match for KiCad's canonical
+     Connector_BarrelJack:BarrelJack_Horizontal — pads 1/2 6mm apart on one row, pad 3 at
+     the row midpoint offset 4.7mm, body extending away from pad 1. Same pad numbering.
+  2. KiCad's Connector:Barrel_Jack_Switch symbol wires pin 1 to the tip-contact arc, pin 2
+     to the shell polyline, and pin 3 to the switch leaf bearing against pin 2.
+  3. CUI PJ-102AH datasheet (same DC-005 family, identical PCB layout: 3.0+3.0mm pad 1<->2,
+     4.7mm pad 3 offset) SCHEMATIC block states outright: 1 = center pin, 2 = sleeve,
+     3 = switch. https://cdn-shop.adafruit.com/datasheets/21mmdcjackDatasheet.pdf
+
+SWITCH is normally closed to SLEEVE with no plug inserted and lifts when a plug is seated;
+tying it to the same net as SLEEVE is the standard "unused" treatment.
 """
 
-P1 = io(Net)
-P2 = io(Net)
-P3 = io(Net)
+CENTER = io(Net)
+SLEEVE = io(Net)
+SWITCH = io(Net)
 
 Component(
     name="POWER-JACK",
     symbol=Symbol(library="POWER-JACK.kicad_sym"),
-    pins={"1": P1, "2": P2, "3": P3},
+    pins={"1": CENTER, "2": SLEEVE, "3": SWITCH},
 )

@@ -6,9 +6,20 @@ the card in the case; the CPU bus is taken at the CPU socket (see cpu_socket.zen
 single-star-point grounding decision (docs/board_floorplan.md), the 50 fingers are left
 UNCONNECTED (floating gold) — every pin on the component is optional and omitted here.
 
-(Mounting holes get added once the 6.0" x 2.75" outline is drawn.)
+SOM mounting holes — 4x Ø2.15mm on a 41.00 x 31.00 mm rectangle (Tang Mega 60K/138K SOM
+mechanical drawing 04_Mechanical_drawing/Tang_Mega_138K_60K_SOM.pdf). M2 hardware. Positions
+are set in tools/floorplan_seed.py relative to the SOM datum (= the centre of this hole
+rectangle), which is the SAME datum CN1/CN2/CN3 are placed from — so the holes stay properly
+spaced relative to the BTB connectors under any SOM placement. Mechanical (unplated) so the
+standoffs add no ground paths, per the single-star-point grounding decision.
 """
 
 AppleIISlot = Module("../components/AppleII/AppleIIBus_Edge/AppleIIBus_Edge.zen")
+MountingHole = Module("@stdlib/generics/MountingHole.zen")
 
 AppleIISlot(name="J_SLOT")   # all 50 fingers optional -> unconnected (mechanical)
+
+MountingHole(name="MH_TL", diameter="M2", plating="Mechanical")   # SOM hole-rect corners (41x31mm)
+MountingHole(name="MH_TR", diameter="M2", plating="Mechanical")
+MountingHole(name="MH_BL", diameter="M2", plating="Mechanical")
+MountingHole(name="MH_BR", diameter="M2", plating="Mechanical")

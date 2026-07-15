@@ -137,11 +137,11 @@ This needs an explicit decision once we know whether the slot edge is used elect
 | Block | Parts | Wants to be near | Notes |
 |---|---|---|---|
 | **SOM** | GW5AT-60 module (45×35 mm, 3 mm standoffs) | — (free variable) | position dictates where the rest lands; C2399 top / C2400 bottom / BTB9900 left, "C" opens right |
-| **SDRAM0** | 1× AS4C16M16SA | **C2399** (BANK1/2) | bank-local, escapes toward C2399 |
-| **SDRAM1** | 1× AS4C16M16SA | **C2400** (BANK6/7/8) | bank-local; C2400 clean field (P1–P50) is the OUTER row → escapes outward |
+| **SDRAM U_LO** (32-bit bank) | 1× AS4C16M16SA | **C2399** (BANK1/2) | Data DQ[15:0] + DQM0/1 bank-local, escape toward C2399. **Sources the SHARED cmd/clk/addr bus** that also feeds U_HI (see the shared-bus note, 2026-07-10). |
+| **SDRAM U_HI** (32-bit bank) | 1× AS4C16M16SA | **C2400** (BANK6/7/8) | Data DQ[31:16] + DQM2/3 bank-local; C2400 clean field (P1–P50) is the OUTER row → escapes outward. Its cmd/clk/addr are **not** bank-local — they arrive via the shared bus from U_LO/C2399. |
 | **USB3 bridge** | CH569 + 30 MHz xtal + USB3 conn | HSPI connector (BANK2 region) | short 90 Ω SS pair to the edge connector |
 | **Programming** | FT2232H + 12 MHz xtal + USB-C | config/JTAG balls | |
-| **Power** | 12 V barrel → MP2315 buck → AMS1117 | barrel at an accessible edge | keep buck switching away from USB3 SS + any analog |
+| **Power** | 12 V barrel → 2× MPM3620A buck (5 V + 3.3 V) | barrel at an accessible edge | integrated-inductor modules (shielded); keep the CIN hot-loop tight and don't slot the ground reference under BTB traces — see **Power block placement** below |
 | **CPU-socket / Apple bus** | 2×20 header + 5×'245 + 2×'T45 + deadman | CPU-ribbon edge | the Apple-bus block; header near where the ribbon exits toward the CPU socket |
 
 Everything hangs off the SOM's three left-side connectors, so **SOM position is the first domino**;
@@ -269,8 +269,8 @@ Working frame: **origin = bottom-left, +x right, +y up, mm.** Board = `(0,0)…(
 | **Power** | 2 – 28 | ~42 – 68 | Upper-left corner; barrel on the left short edge. |
 | **CH569 + SS USB3** | 2 – 30 | ~24 – 42 | Mid-left; short HSPI run right into BTB9900; SS pair to a left-edge USB conn. |
 | **FT2232 + USB-C** | 2 – 30 | ~4 – 24 | Bottom-left; JTAG/UART up into BTB9900. |
-| **SDRAM0** (→ C2399) | ~100 – 126 | ~38 – 52 | Upper-right, against C2399 (top). Bank-local BANK1/2 (+2 borrowed BANK4). |
-| **SDRAM1** (→ C2400) | ~100 – 126 | ~16 – 30 | Lower-right, against C2400 (bottom). Bank-local BANK6/7/8. |
+| **SDRAM U_LO** (→ C2399) | ~100 – 126 | ~38 – 52 | Upper-right, against C2399 (top). Data+DQM bank-local BANK1/2 (+2 borrowed BANK4); sources the shared cmd/clk/addr bus. |
+| **SDRAM U_HI** (→ C2400) | ~100 – 126 | ~16 – 30 | Lower-right, against C2400 (bottom). Data+DQM bank-local BANK6/7/8; shared bus arrives from U_LO/C2399 — keep the two devices vertically close to bound the shared-bus stubs. |
 | **Apple glue** (5×'245, 2×'T45, deadman) | ~126 – 150 | ~16 – 55 | Far right, past the SDRAMs. A-side ← FPGA GPIO on C2400 spill. |
 | **2×20 CPU header** | ~95 – 146 | ~13 – 19 | **Horizontal, low/right near the slot** — ribbon drops toward the //e CPU socket. |
 | **Slot fingers** | ~78 – 143 | 0 – ~2 | Bottom edge (tab centre 110.49). Floating (mechanical only). |
@@ -280,11 +280,119 @@ Working frame: **origin = bottom-left, +x right, +y up, mm.** Board = `(0,0)…(
   from the **top edge** (v1 lock) to **horizontal near the slot** — this revises the v1 "machine-facing
   end = top edge" note; the ribbon now exits low toward the motherboard CPU socket. Confirm the ribbon
   reach and that the header/glue clear the finger keep-out (y≲12).
-- "SDRAM0 near C2 / SDRAM1 near C1" (as stated) is read as SDRAM0↔C2399(top), SDRAM1↔C2400(bottom) —
-  forced by bank locality (SDRAM0=U_LO=BANK1/2, SDRAM1=U_HI=BANK6/7/8), matching the wiring in
-  `appletini_mega.zen`.
+- "SDRAM0 near C2 / SDRAM1 near C1" (as stated) is read as U_LO↔C2399(top), U_HI↔C2400(bottom) —
+  the *data*+DQM halves are forced by bank locality (U_LO=BANK1/2, U_HI=BANK6/7/8), matching the
+  wiring in `appletini_mega.zen`. As of 2026-07-10 the two are one 32-bit bank on a shared
+  cmd/clk/addr bus — see the shared-bus note below.
 - Seeder (`tools/floorplan_seed.py`) updated: SOM anchor datum → board centre (76.2). Trays are still
   a staging aid below the board — drag each labeled cluster to its target above.
+
+## SDRAM = one 32-bit bank on a shared bus (2026-07-10)
+
+The two AS4C16M16SA x16 devices were formerly wired as **two independent 16-bit buses**
+(each with its own command/clock/address, point-to-point and bank-local). They are now
+**teamed into a single 32-bit-wide bank** (`modules/sdram.zen`), the standard way to build a
+32-bit datapath from two x16 parts:
+
+- **Shared, one net → BOTH devices:** `CLK`, `CKE`, `A[12:0]`, `BA[1:0]`, `N_CS`, `N_RAS`,
+  `N_CAS`, `N_WE`. Sourced from **U_LO's BANK1/2 balls on C2399** and fanned across to U_HI.
+- **Independent:** the 32 data bits (U_LO=DQ[15:0], U_HI=DQ[31:16]) and the **4 DQM byte
+  write enables** (DQM0/1 on U_LO, DQM2/3 on U_HI — one per byte lane of the word).
+- U_HI's 21 former command/address balls on C2400 are **freed** (dropped from the ball map).
+
+**Floorplan / routing consequences:**
+- The shared cmd/clk/addr bus is **no longer point-to-point or bank-local** — it spans from
+  C2399 (top) across the right field to C2400 (bottom). Route it as a **fly-by / T-topology
+  multidrop bus**, and place **U_LO and U_HI vertically close** (they already sit ~8 mm apart,
+  ~38–52 and ~16–30 mm) to bound the stub/branch lengths.
+- Series **termination** on the shared address/clock lines now matters (two loads on a shared
+  net at 143 MHz) — reserve pad space near the branch point / at the far device. It did not
+  matter before (single-load point-to-point).
+- **CLK** is the most sensitive shared net: match U_LO and U_HI clock-branch lengths, or
+  absorb the residual skew in the FPGA (per CLAUDE.md's skew guidance — never in carrier
+  copper beyond what's matchable).
+- Data + DQM stay bank-local point-to-point, unchanged: U_LO escapes toward C2399, U_HI's
+  data escapes outward on the C2400 clean field (P1–P50).
+
+This is an intentional trade: a shared bus costs a cross-field multidrop route + termination
+but halves the FPGA ball count for control (~21 balls freed) and gives a true 32-bit word with
+4-byte write granularity. SDRAM remains the most forgiving of the board's buses.
+
+## Power block placement (2026-07-12)
+
+The power stage is **two `MPM3620A` integrated-inductor buck modules** off the protected 12 V
+rail — 5 V and 3.3 V, independent (not cascaded) — plus the shared input-protection chain
+(barrel → PPTC fuse → reverse-polarity P-FET → SMBJ12A TVS). See `modules/power.zen`. The
+inductor + VCC/bootstrap caps are *inside* each module (QFN-20 3×5 mm), so a rail is only **5
+external parts**: `CIN` (10 µF), `COUT` (22 µF), `REN` (EN pull-up), and the `RTOP`/`RBOT` FB
+divider. `SW`/`BST`/`VCC` are left unconnected (no external parts).
+
+**Why proximity to the bucks is low-risk (and what actually is):** the shielded module buries the
+switching node and inductor, so radiated near-field is low — the real aggressor is the **`CIN`
+input hot-loop** (highest di/dt on the board), the rail traces, and the module's ground return.
+"Keep BTB traces away from power" therefore means *keep them off the same layer as the hot-loop/
+rails and out of the buck's ground return* — a stackup constraint you can satisfy at almost any
+X/Y placement, not a keep-out that pins the floorplan. See the BTB-vs-power reasoning in the
+grounding discussion above; the forgiving BTB bundles (JTAG/config/UART, Apple-bus spill) are the
+ones that may share turf with power, while the SDRAM shared clock/address bus wants breathing room.
+
+### Per-module escape map (real `MPM3620AGQV-Z` pads, +y up)
+```
+              SW ···················· OUT        <- TOP edge = OUTPUT corner (pad 9)
+      FB(1) -+                          +- NC(10)
+     VCC(2) -+       MPM3620A           +- BST(11)
+    AGND(3) -+       (2.9 x 3.7 mm)     +- PGND(12)
+             PG  EN  IN  NC  PGND  PGND         <- BOTTOM edge = INPUT + POWER-GND
+```
+Key fact: **IN (pad 16) and PGND (pads 13/14, + 12 on the right edge) share the bottom edge** —
+that is where the `CIN` hot-loop lives, and it is the single most important placement on the block.
+`OUT` (pad 9) is the top-right corner; `FB` (pad 1) is mid-left.
+
+### The 5 passives, per rail
+| Part (`power.zen`) | Value | Placement | Why |
+|---|---|---|---|
+| `*_CIN` | 10 µF 0805 | hug the bottom edge, straddle IN(16)↔PGND(13/14) | the hot loop — minimize IN→cap→PGND area |
+| `*_REN` | 100 k 0402 | at EN(17), tie up to the P12V/IN rail | EN and IN share the edge — trivial |
+| `*_COUT` | 22 µF 0805 | at OUT(9) top-right corner, return to PGND(12) | output cap; its return is the right-edge ground |
+| `*_RTOP`/`*_RBOT` | 0402 divider | off the left edge at FB(1); RBOT ground to AGND(3) | keep the FB node tiny and quiet; tap RTOP from COUT/OUT with a thin sense trace |
+
+### Dual-rail arrangement
+Both modules same orientation, input edges facing the protection chain / P12V feed, outputs
+escaping toward their loads. `D_IN` (TVS) sits at the P12V node where the bus splits to the two
+`CIN`s, so it clamps the whole bus.
+```
+ barrel -> F_IN -> Q_RP -> D_IN --+-------------------+---   P12V pour
+        (fuse)  (P-FET) (TVS)      |                   |
+                             [CIN 10uF]           [CIN 10uF]
+                         ||=IN | PGND=||       ||=IN | PGND=||
+                         ||  U_BUCK5   ||       ||  U_BUCK33  ||
+                         ||=====OUT====||       ||=====OUT====||
+                      REN | FB-div |          REN | FB-div |
+                        [COUT 22uF]             [COUT 22uF]
+                           |                       |
+                          P5V ->                 P3V3 ->
+                     (VBUS_SOM +             (VCCIO / SDRAM /
+                      Apple 5V side)          CH569 / FT2232)
+```
+
+### What the 6-layer stack buys (the 2-layer references can't show this)
+1. **Solid GND plane on the layer directly under the modules** = the return reference; PGND
+   current returns straight down, not sideways through a pour. This alone handles most of the
+   "buck near BTB traces" concern.
+2. **Via-stitch every PGND pad straight into that plane** (small array at pads 12/13/14) — also
+   the thermal path (both rails are lightly loaded, ~55 % / ~28 % of 2 A, so this runs cool).
+3. **Don't slot that plane.** If a P12V/P5V island is needed, put it on a *different* layer than
+   the one nearby BTB signals reference — keep the ground reference under the power block unbroken.
+4. **AGND vs PGND:** both land on `GND` in the netlist, but on copper reference `RBOT`/FB to the
+   AGND(3) pad and stitch AGND to the plane at one quiet point near the module.
+
+### Seeder support
+`tools/floorplan_seed.py` → `place_power()` drops this whole cluster pre-assembled (module IC + 5
+passives at the pin positions above, protection chain fanned in from the jack). `MODULE_PINS` holds
+the IN/OUT/FB/EN pad coordinates — regenerate it if the module footprint changes. The block
+currently anchors at the **upper-right notch** (barrel jack on the notch short-edge so its DC cable
+clears via the notch); this supersedes the v2 "barrel on the left short edge" note — power location
+is still a free variable, but the *internal cluster geometry* above is placement-independent.
 
 ## Open questions (updated 2026-07-08)
 
