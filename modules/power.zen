@@ -26,7 +26,7 @@ Resistor = Module("@stdlib/generics/Resistor.zen")
 Capacitor = Module("@stdlib/generics/Capacitor.zen")
 Tvs = Module("@stdlib/generics/Tvs.zen")
 BarrelJack = Module("../components/JLCPCB_Assembly/POWER-JACK/POWER-JACK.zen")
-Fuse = Module("../components/Bourns_Inc/MF-MSMF110-2/MF-MSMF110-2.zen")   # 1.1A hold PPTC
+Fuse = Module("../components/Bourns_Inc/MF-MSMF110-24X-2/MF-MSMF110-24X-2.zen")   # 1.1A hold PPTC, 24V
 Mosfet = Module("../components/ElecSuper/AO3401A/AO3401A.zen")           # P-FET, reverse-polarity
 Buck = Module("../components/Monolithic_Power_Systems_Inc/MPM3620AGQV-Z/MPM3620AGQV-Z.zen")
 
@@ -41,7 +41,10 @@ _VIN = Net("VIN_RAW")
 _VIN_F = Net("VIN_FUSED")
 _PGATE = Net("RP_GATE")
 BarrelJack(name="J_PWR", CENTER=_VIN, SLEEVE=GND.NET, SWITCH=GND.NET)   # center-positive 12V in
-Fuse(name="F_IN", P1=_VIN, P2=_VIN_F)                       # 1.1A resettable PPTC (overcurrent)
+# 24V-rated variant, deliberately: a PPTC's Vmax is what it must hold off WHEN TRIPPED (the full
+# supply lands across it once it goes high-resistance). The plain MF-MSMF110-2 is a 6V part — it
+# was fine at 0.14V of drop in normal use and 2x over-rated the instant it did its job.
+Fuse(name="F_IN", P1=_VIN, P2=_VIN_F)                       # 1.1A hold / 2.2A trip PPTC (overcurrent)
 Mosfet(name="Q_RP", D=_VIN_F, S=P12V.NET, G=_PGATE)         # P-FET reverse-polarity: D=in, S=load
 # Gate divider, NOT a bare pulldown: AO3401A Vgs max is ±12V, so tying the gate straight to GND
 # runs Vgs = -12V AT the limit in normal operation, and -19.9V when D_IN clamps. 100k/100k gives

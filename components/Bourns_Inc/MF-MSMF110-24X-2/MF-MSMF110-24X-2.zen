@@ -1,0 +1,34 @@
+"""
+MF-MSMF110/24X-2 — Bourns Multifuse PPTC resettable fuse, 1.1A hold / 2.2A trip, 1812.
+LCSC C210835.
+
+Derived from the MF-MSMF110-2 component in this repo (same series, same 1812 body, same
+1.1A/2.2A trip point) — only the VOLTAGE variant differs, and that is the whole point:
+
+  MF-MSMF110-2      Vmax =  6.0 V   <- standard voltage ("-2" is the tape-and-reel suffix,
+                                       NOT a voltage code; see the ordering table in docs/)
+  MF-MSMF110/16-2   Vmax = 16.0 V
+  MF-MSMF110/24X-2  Vmax = 24.0 V   <- this part
+
+Vmax is the voltage the device must withstand WHEN TRIPPED — tripped, it goes high-resistance
+and the full supply voltage lands across it. The 6V part was previously used on the 12V input,
+i.e. at 2x its rating, so it was safe right up until the overcurrent it exists to interrupt.
+The datasheet's "no arcing or burning" guarantees (trip cycle life, trip endurance) are
+specified AT Vmax and do not hold above it.
+
+24V (not 16V) so the whole 12V front end is coherent at one ceiling: it matches the MPM3620A
+buck's 24V max input, and it survives the D_IN crowbar case (an over-voltage supply drives the
+TVS into conduction -> current through this fuse -> trip -> the supply voltage now sits across
+the tripped fuse). Trade-off vs /16: Imax 20A instead of 100A (still far beyond any barrel
+supply's fault current) and Rmin 60mohm instead of 40mohm (~41mV drop at the board's ~0.68A,
+vs ~27mV — irrelevant here).
+"""
+
+P1 = io(Net)
+P2 = io(Net)
+
+Component(
+    name="MF-MSMF110-24X-2",
+    symbol=Symbol(library="MF-MSMF110-24X-2.kicad_sym"),
+    pins={"1": P1, "2": P2},
+)
