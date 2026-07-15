@@ -26,6 +26,21 @@ check against the SOM mechanical spec.
 
 DF40_100 = Module("../components/HRS_Hirose/DF40C-100DS-0_4V_51/DF40C-100DS-0_4V_51.zen")
 DF40_80 = Module("../components/HRS_Hirose/DF40C-80DS-0_4V_51/DF40C-80DS-0_4V_51.zen")
+MountingHole = Module("@stdlib/generics/MountingHole.zen")
+
+# --- SOM mounting holes: 4x M2 (Ø2.15mm) on a 41.00 x 31.00 mm rectangle, per the Tang Mega
+# 60K/138K SOM mechanical drawing (04_Mechanical_drawing/Tang_Mega_138K_60K_SOM.pdf).
+# These live HERE, not in mechanical.zen, on purpose: they are the mechanical half of the SOM
+# mating interface and must stay registered to CN1/CN2/CN3 (the hole-rect centre IS the SOM
+# datum both are placed from -- see tools/floorplan_seed.py). The Zener sync groups footprints
+# BY SHEET, so declaring them in mechanical.zen put them in a different KiCad group from the
+# connectors they are rigidly tied to; same sheet -> same group -> they stage and move as one
+# constellation. Mechanical (unplated) so the standoffs add no ground paths, per the
+# single-star-point grounding decision (docs/board_floorplan.md).
+MountingHole(name="MH_TL", diameter="M2", plating="Mechanical")
+MountingHole(name="MH_TR", diameter="M2", plating="Mechanical")
+MountingHole(name="MH_BL", diameter="M2", plating="Mechanical")
+MountingHole(name="MH_BR", diameter="M2", plating="Mechanical")
 
 # --- shared power / ground rails on the BTB ---
 GND = io("GND", Ground)

@@ -393,7 +393,9 @@ def compute():
     # SOM mounting holes: 41x31mm rectangle on the SAME datum as CN1-3 (som_placement.md /
     # the SOM mechanical drawing). Placed by instance name -> ref so they track the BTB
     # connectors under any SOM move. +x right, +y down; datum = hole-rect centre.
-    mech = sheet_instances("MECH")
+    # They live on the SOM sheet (not MECH) so the sync groups them WITH CN1/CN2/CN3 --
+    # same group = the constellation stages and drags as one rigid unit in KiCad.
+    mech = sheet_instances("SOM")
     for inst, (dx, dy) in {"MH_TL": (-20.5, -15.5), "MH_TR": (20.5, -15.5),
                            "MH_BL": (-20.5, 15.5), "MH_BR": (20.5, 15.5)}.items():
         if inst in mech:
