@@ -22,6 +22,9 @@ USBC = Module("../components/JLCPCB_Assembly/type-c24p/type-c24p.zen")
 GND = io("GND", Ground)  # shared board ground (top-level owns it)
 P3V3 = io("P3V3", Power)  # shared 3.3V rail from the power module
 P1V2 = Power("CH_1V2")  # CH569 internal-LDO core rail (V12CORE/V12USB) -- local
+# USB VBUS: presence-sensed only (never drawn). Ported out to the power module, which diode-ORs it
+# with the FT2232H port's VBUS to gate the bucks -- so the board powers up/down with the Pi5 host.
+VBUS = io("VBUS", Net, optional=True) or Net("CH_VBUS_SENSE")
 
 
 # HSPI bus (32 data HD0-31 + 2 clocks HTCLK/HRCLK + 6 handshake) -- the 40 fixed CH569 PA/PB
@@ -162,7 +165,7 @@ USBC(
     CC2=_CC2,
     SUB1=Net("CH_SBU1"),
     SUB2=Net("CH_SBU2"),
-    VBUS=Net("CH_VBUS_SENSE"),
+    VBUS=VBUS,  # -> power module buck-enable diode-OR (sensed, not drawn)
     GND=GND.NET,
     P25=GND.NET,
     P3=GND.NET,

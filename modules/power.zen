@@ -8,8 +8,9 @@ Topology (CARRIER_PLAN "Power delivery"):
 
   NOTE: the carrier 5 V does NOT feed the Apple-bus level shifters. Their 5 V side (VCCB) is the
   HOST's socket 5 V (SKT_5V, DIP pin 8), taken in cpu_socket.zen -- so a dead host forces those
-  parts Hi-Z (Ioff). The only host-5V consumers are: transceiver VCCB, the deadman, the 5V-detect,
-  and the buck EN gate below. Host 5 V is a reference/enable input here, not a carrier rail.
+  parts Hi-Z (Ioff). The host-5V consumers are: transceiver VCCB, the deadman, and the 5V-detect.
+  Host 5 V is a reference input here, not a carrier rail, and (as of the USB-VBUS enable below) it
+  no longer gates the bucks.
 
 Both rails are SWITCHING (no LDO) so 5->3.3 V isn't burned as heat — the total dissipation
 is roughly halved and spread across two packages, which matters in a poorly-ventilated case.
@@ -19,9 +20,12 @@ margin a non-issue. The MPM3620A integrates the inductor + VCC/bootstrap caps, s
 needs only 4 dedicated parts: input cap, output cap, and a 2-resistor FB divider (Vref = 0.8 V);
 the enable network below is SHARED by both. Input PROTECTION stays board-level (modules omit it).
 
-ENABLE: both bucks share one VEN node, a 2-input OR (Apple 5 V live, OR bench 5 V) with a default
-pulldown -- see the block above the rail() calls. The carrier stays dark until the Apple is powered
-(power saving), and a bench 5 V clip on H_EN runs it standalone for FPGA/USB bring-up with no Apple.
+ENABLE: both bucks share one VEN node, driven by a diode-OR of the two USB-C VBUS presence lines
+(the Pi5 SuperSpeed link on usb3's J_USB_CH, and the FT2232H JTAG link on programming's J_USB_FT)
+with a default pulldown -- see the block above the rail() calls. The carrier powers up/down WITH the
+Pi5 (plug the USB3 cable), and the JTAG cable enables standalone FPGA/USB bring-up with no Apple and
+no Pi5. VBUS is only SENSED to gate EN (~24 uA through the divider) -- it is NEVER a power source;
+every rail is derived from the 12 V barrel jack, so USB presence enables, it does not power.
 
 Barrel jack = LCSC/JLCPCB POWER-JACK (3-terminal, DC-005/044 family). Expects a CENTER-POSITIVE
 12V supply — the near-universal convention for barrel supplies (EIAJ RC-5320A), and the polarity
@@ -38,16 +42,18 @@ BarrelJack = Module("../components/JLCPCB_Assembly/POWER-JACK/POWER-JACK.zen")
 Fuse = Module("../components/Bourns_Inc/MF-MSMF110-24X-2/MF-MSMF110-24X-2.zen")   # 1.1A hold PPTC, 24V
 Mosfet = Module("../components/ElecSuper/AO3401A/AO3401A.zen")           # P-FET, reverse-polarity
 Buck = Module("../components/Monolithic_Power_Systems_Inc/MPM3620AGQV-Z/MPM3620AGQV-Z.zen")
-PinHeader = Module("@stdlib/generics/PinHeader.zen")   # bench-enable tap (H_EN, unpopulated THT hole)
+Diode = Module("@stdlib/generics/Rectifier.zen")   # Schottky diode-OR of the two USB VBUS enables
 
 # Rails are PORTS (this module SOURCES them for the whole board).
 GND = io("GND", Ground)
 P5V = io("P5V", Power)
 P3V3 = io("P3V3", Power)
 P12V = Power("P12V")
-# The HOST'S socket 5 V (from cpu_socket's DIP pin 8), brought in ONLY to enable the bucks:
-# the carrier stays dark until the Apple is powered, so an idle host doesn't pointlessly run us.
-HOST_5V = io("HOST_5V", Net, optional=True) or Net("SKT_5V")
+# The two USB-C VBUS presence lines, brought in ONLY to enable the bucks (sensed, never drawn):
+# CH = the Pi5 SuperSpeed link (usb3.J_USB_CH), FT = the FT2232H JTAG link (programming.J_USB_FT).
+# The carrier powers up with either cable, so an idle bench/host doesn't pointlessly run us.
+USB_CH_VBUS = io("USB_CH_VBUS", Net, optional=True) or Net("CH_VBUS_SENSE")  # Pi5 USB3 VBUS
+USB_FT_VBUS = io("USB_FT_VBUS", Net, optional=True) or Net("FT_VBUS_SENSE")  # FT2232H JTAG VBUS
 
 # ---- input: barrel jack -> PPTC fuse -> reverse-polarity P-FET -> P12V (protected) ----
 _VIN = Net("VIN_RAW")
@@ -72,24 +78,30 @@ Resistor(name="R_RP", value="100kohm", package="0402", P1=_PGATE, P2=GND.NET)
 # to a dedicated 13V part (SMBJ13A, clamp 21.5V) — the Tvs generic won't carry a custom MPN here.
 Tvs(name="D_IN", package="DO-214AA", reverse_standoff_voltage="12V", K=P12V.NET, A=GND)
 
-# ---- shared buck ENABLE: a 2-input OR (Apple 5 V live, OR bench 5 V) with a default pulldown ----
-# Both bucks tie EN to one VEN node. Both enable sources are in the 5 V domain (<= the 6 V EN abs
-# max), so there is no divider/clamp/back-feed to worry about -- it is just two pull-ups + a pulldown:
-#   - Apple live: HOST_5V --100k--> VEN gives VEN = 5 * 100/200 = 2.5 V (>> the 1.65 V max rising
-#     threshold; the buck drops out only if the host sags below ~3.3 V). Default power-saving gate.
-#   - Bench:      clip 5 V onto H_EN (an UNPOPULATED THT hole on VEN) -> VEN ~ 5 V, carrier runs with
-#     no Apple for FPGA/USB bring-up. Solder a header pin into the hole only when you need it.
-#     LAYOUT: call out "BENCH 5V EN" on F.SilkS next to H_EN (same convention as the jack polarity),
-#     so the tap is self-documenting and nobody drives 12 V into it.
-#   - Off:        R_EN_PD holds VEN low by default -> both bucks off (~6.5 uA shutdown each), and this
-#     net never touches 12 V so there is ZERO standby draw off the barrel through it.
-# Bench 5 V and Apple 5 V are never live together (you would never leave the bench clip on while
-# seating the card in the Apple), so the both-on corner needs no design. The ~50 uA that bleeds
-# HOST_5V-ward through R_EN_APPLE during bench use is harmless.
+# ---- shared buck ENABLE: Schottky diode-OR of the two USB VBUS lines -> divider -> VEN ----
+# Both bucks tie EN to one VEN node. Enable = "either USB-C cable has VBUS": diode-OR the two 5 V
+# presence lines into a summing node _ENP, then a 100k/100k divider halves it onto VEN.
+#   - WHY DIODES, not a resistor-OR: unlike the old Apple/bench inputs (never live together), the
+#     two USB ports CAN be plugged at once, and a port plugged into a powered-OFF host holds its
+#     VBUS at ~0 V (actively, through the host's discharge path) -- not floating. A bare resistor-OR
+#     would let that grounded port act as a second pulldown and drag VEN to ~1.67 V, right on the
+#     1.65 V rising threshold. The Schottkys block the grounded port (its diode reverse-biases), so
+#     _ENP always follows the HIGHEST present VBUS regardless of the other port's state.
+#   - ON:  _ENP ~= VBUS - Vf ~= 4.85 V; VEN = _ENP/2 ~= 2.4 V (>> 1.65 V threshold; holds until VBUS
+#     sags below ~3.4 V). The divider both defines the operating point and keeps EN well under its
+#     6 V abs max even on a USB hot-plug overshoot (any spike is halved). Draw is ~24 uA through the
+#     divider, sourced from VBUS -- sense-level only, so USB never actually powers the board.
+#   - OFF: R_EN_PD holds VEN low by default -> both bucks off (~6.5 uA shutdown each). VEN reaches
+#     VBUS only through the diodes and never touches the 12 V rail, so there is ZERO standby draw off
+#     the barrel through it; with no USB present, only diode reverse leakage (~uA) sits on _ENP.
 VEN = Net("VEN")
-Resistor(name="R_EN_APPLE", value="100kohm", package="0402", P1=HOST_5V, P2=VEN)  # Apple 5 V -> enable
-Resistor(name="R_EN_PD", value="100kohm", package="0402", P1=VEN, P2=GND.NET)     # default OFF
-PinHeader(name="H_EN", pins=1, rows=1, mount="THT", pitch="2.54mm", gender="Male", P1=VEN)  # bench 5 V clip (DNP)
+_ENP = Net("EN_PRESENT")  # diode-OR summing node (~ highest present VBUS - Vf)
+# 30V/350mA Schottky (house SD103BWS); the diode-OR only ever passes the ~24 uA divider current,
+# so IF(AV) is a package/house-match formality, not a real thermal spec.
+Diode(name="D_EN_CH", technology="Schottky", package="SOD-323", reverse_voltage="30V", forward_current="350mA", A=USB_CH_VBUS, K=_ENP)
+Diode(name="D_EN_FT", technology="Schottky", package="SOD-323", reverse_voltage="30V", forward_current="350mA", A=USB_FT_VBUS, K=_ENP)
+Resistor(name="R_EN_TOP", value="100kohm", package="0402", P1=_ENP, P2=VEN)   # top of EN divider
+Resistor(name="R_EN_PD", value="100kohm", package="0402", P1=VEN, P2=GND.NET)  # default OFF + divider bottom
 
 # ---- one MPM3620A rail: integrated-inductor buck (Vref = 0.8 V); EN is the shared VEN ----
 def rail(name, vout, r_top, r_bot):

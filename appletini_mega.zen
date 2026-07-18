@@ -103,9 +103,15 @@ Board(
 GND = Ground()
 P5V = Power("P5V")  # VBUS_SOM 5V (buck output) -> SOM P5V pins
 P3V3 = Power("P3V3")  # 3.3V (LDO output) -> logic + VCCIO + IC rails
-# Host socket 5 V: SOURCED at the CPU socket (DIP pin 8), CONSUMED by the power module to gate the
-# buck EN pins (carrier stays dark until the Apple is powered). Not a carrier rail -- a host input.
+# Host socket 5 V: SOURCED at the CPU socket (DIP pin 8), CONSUMED by cpu_socket for the transceiver
+# VCCB / deadman / 5V-detect. Not a carrier rail -- a host input. (It no longer gates the bucks; the
+# buck enable is now the USB-VBUS diode-OR below.)
 SKT_5V = Net("SKT_5V")
+# USB-C VBUS presence lines -- SENSED only (never drawn), diode-OR'd in the power module to enable the
+# bucks: the board powers up/down with the Pi5 (CH link) or with a plugged JTAG cable (FT link). Owned
+# here so the connector (usb3 / programming) and the enable gate (power) share one physical net each.
+USB_CH_VBUS = Net("CH_VBUS_SENSE")  # Pi5 USB3 SuperSpeed link
+USB_FT_VBUS = Net("FT_VBUS_SENSE")  # FT2232H JTAG/UART link
 
 # ============================================================================
 # SDRAM pilot wiring: (sdram_port, som_ball, functional_net) triples.
@@ -318,7 +324,7 @@ _prog_kw = {p: _jnets[nn] for (p, _b, nn) in _JTU_MAP}
 # ============================================================================
 # Instantiate subsystems with rails wired. Signals wired: SDRAM + HSPI. Apple/JTAG next.
 # ============================================================================
-PowerMod(name="PWR", GND=GND, P5V=P5V, P3V3=P3V3, HOST_5V=SKT_5V)
+PowerMod(name="PWR", GND=GND, P5V=P5V, P3V3=P3V3, USB_CH_VBUS=USB_CH_VBUS, USB_FT_VBUS=USB_FT_VBUS)
 
 SomBtb(
     name="SOM",
@@ -333,7 +339,7 @@ SomBtb(
 
 Sdram(name="SDRAM", GND=GND, VDD=P3V3, **_sdram_kw)
 
-Programming(name="PROG", GND=GND, P3V3=P3V3, **_prog_kw)
-Usb3Bridge(name="USB3", GND=GND, P3V3=P3V3, **_hspi_ch_kw)
+Programming(name="PROG", GND=GND, P3V3=P3V3, VBUS=USB_FT_VBUS, **_prog_kw)
+Usb3Bridge(name="USB3", GND=GND, P3V3=P3V3, VBUS=USB_CH_VBUS, **_hspi_ch_kw)
 CpuSocket(name="CPU", GND=GND, P3V3=P3V3, SKT_5V=SKT_5V, **_cpu_kw)
 Mechanical(name="MECH")

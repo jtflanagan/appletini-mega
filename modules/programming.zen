@@ -24,6 +24,9 @@ USBC = Module("../components/Korean_Hroparts_Elec/TYPE-C-31-M-12/TYPE-C-31-M-12.
 GND = io("GND", Ground)  # shared board ground (top-level owns it)
 P3V3 = io("P3V3", Power)  # shared 3.3V rail from the power module
 P1V8 = Power("FT_1V8")  # FT2232H internal LDO (VREGOUT) rail -- local
+# USB VBUS: presence-sensed only (never drawn). Ported out to the power module, which diode-ORs it
+# with the CH569 port's VBUS to gate the bucks -- so plugging the JTAG cable enables bench bring-up.
+VBUS = io("VBUS", Net, optional=True) or Net("FT_VBUS_SENSE")
 
 
 # JTAG (to SOM BANK12 config balls) + UART console are exposed as optional io() PORTS so the
@@ -123,7 +126,7 @@ _CC1 = Net("FT_CC1")
 _CC2 = Net("FT_CC2")
 USBC(
     name="J_USB_FT",
-    VBUS=Net("FT_VBUS_SENSE"),
+    VBUS=VBUS,  # -> power module buck-enable diode-OR (sensed, not drawn)
     DP1=_DP,
     DP2=_DP,
     DN1=_DM,
