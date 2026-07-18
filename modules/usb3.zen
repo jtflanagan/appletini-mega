@@ -13,6 +13,8 @@ WIRED (attempt 2): the 40 HSPI pins (HD0-31 + HTCLK/HRCLK + 6 handshake) are io(
 top maps onto SOM balls near CH569; rails are shared ports. Other CH569 GPIO stay local.
 """
 
+load("@stdlib/units.zen", "Impedance")
+
 Resistor = Module("@stdlib/generics/Resistor.zen")
 Capacitor = Module("@stdlib/generics/Capacitor.zen")
 Crystal = Module("@stdlib/generics/Crystal.zen")
@@ -36,16 +38,19 @@ def _hspi(nm):
 
 _XI = Net("CH_XI")
 _XO = Net("CH_XO")
-_UDP = Net("USB_CH_DP")
-_UDN = Net("USB_CH_DM")
+# 90R differential: USB2 D+/D- (HS) and the USB3 SS pairs. Impedance= tags map these nets to the
+# "90Ohm Diff" netclass at layout. NB the SS TX link is TWO segments across the AC caps (SSTX* and
+# TX1*) -- both carry the 5 Gbps signal, so both are tagged. CC1/CC2 are config (not a pair).
+_UDP = Net("USB_CH_DP", impedance=Impedance(90))
+_UDN = Net("USB_CH_DM", impedance=Impedance(90))
 _CC1 = Net("CH_CC1")
 _CC2 = Net("CH_CC2")
-_SSTXA = Net("CH_SSTXP")
-_SSTXB = Net("CH_SSTXN")  # CH569 SS TX pair (pre AC-couple)
-_SSRXA = Net("CH_SSRXP")
-_SSRXB = Net("CH_SSRXN")  # CH569 SS RX pair
-_TX1P = Net("USB_TX1_P")
-_TX1N = Net("USB_TX1_N")  # AC-coupled SS TX to USB-C
+_SSTXA = Net("CH_SSTXP", impedance=Impedance(90))
+_SSTXB = Net("CH_SSTXN", impedance=Impedance(90))  # CH569 SS TX pair (pre AC-couple)
+_SSRXA = Net("CH_SSRXP", impedance=Impedance(90))
+_SSRXB = Net("CH_SSRXN", impedance=Impedance(90))  # CH569 SS RX pair
+_TX1P = Net("USB_TX1_P", impedance=Impedance(90))
+_TX1N = Net("USB_TX1_N", impedance=Impedance(90))  # AC-coupled SS TX to USB-C
 
 CH569(
     name="U_CH",

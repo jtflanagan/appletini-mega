@@ -38,7 +38,10 @@ load(
     "Holes",
     "Silkscreen",
     "SolderMask",
+    "NetClass",
+    "BASE_6L_NETCLASSES",
 )
+load("@stdlib/units.zen", "Impedance")
 
 SomBtb = Module("modules/som_btb.zen")
 PowerMod = Module("modules/power.zen")  # not 'Power' -- that's the builtin net constructor
@@ -47,6 +50,35 @@ Programming = Module("modules/programming.zen")
 Usb3Bridge = Module("modules/usb3.zen")
 CpuSocket = Module("modules/cpu_socket.zen")
 Mechanical = Module("modules/mechanical.zen")
+
+# ---- Impedance netclass override: re-derive 50R SE + 90R Diff for JLC06161H-3313 as MICROSTRIP.
+# The inherited BASE_6L values were computed as GCPW on generic FR-4; we route plain microstrip
+# (no coplanar-ground rail -- see docs/board_floorplan.md + memory). Widths computed against JLC's
+# published outer-layer stack: 0.0994 mm prepreg 3313 (Dk 4.1), 1 oz Cu, coated (0.015 mm mask,
+# Dk 3.8). 50R SE = Hammerstad-Jensen (<2% conf). 90R diff = coupled-line estimate (~5-10%) --
+# CONFIRM in JLC's impedance calculator before ordering controlled impedance. Lists REPLACE on merge,
+# so rebuild the full list from BASE_6L_NETCLASSES and swap only these two by name.
+# CAVEAT: inner L4 (stripline) wants ~0.19 mm for 50R (thinner inner Cu) -- one netclass width can't
+# hold both layers; 0.157 mm targets the OUTER microstrip. Route SDRAM/HSPI mostly on L1/L6, or add a
+# separate inner-layer 50R class if precise control is needed on L4.
+_netclasses = [nc for nc in BASE_6L_NETCLASSES if nc.name not in ("50Ohm SE", "90Ohm Diff")] + [
+    NetClass(
+        name="50Ohm SE",
+        clearance=0.2,
+        track_width=0.157,  # outer microstrip, coated (was 0.1461 GCPW)
+        color="#0000C2FF",
+        single_ended_impedance=Impedance(50),
+    ),
+    NetClass(
+        name="90Ohm Diff",
+        clearance=0.2,
+        track_width=0.16,
+        diff_pair_width=0.16,  # estimate -- confirm in JLC impedance calc
+        diff_pair_gap=0.13,
+        color="#00C200FF",
+        differential_pair_impedance=Impedance(90),
+    ),
+]
 
 # ============================================================================
 # Manufacturing target = JLCPCB, 6-layer, 1oz outer / 0.5oz inner, 1.6 mm, ENIG.
@@ -92,6 +124,7 @@ Board(
                     minimum_width=0.1,  # JLC min mask dam on green mask
                 ),
             ),
+            netclasses=_netclasses,  # 50R SE + 90R Diff re-derived for JLC microstrip (see above)
         ),
     ),
 )
@@ -186,7 +219,10 @@ _SDRAM_MAP = [
     ("CLK", "SOM_C18", "SDRAM_CLK"),
     ("CKE", "SOM_A18", "SDRAM_CKE"),
 ]
-_snets = {nn: Net(nn) for (_sp, _sb, nn) in _SDRAM_MAP}
+# 50R single-ended, impedance-controlled: the SDRAM bus runs ~100-166 MHz SDR -> transmission-line
+# behaviour over carrier-length traces. Tag every SDRAM net (DQ/addr/ctrl/clk) to the "50Ohm SE"
+# netclass. (Length/skew matching is a separate routing task, not a netclass property.)
+_snets = {nn: Net(nn, impedance=Impedance(50)) for (_sp, _sb, nn) in _SDRAM_MAP}
 _sdram_kw = {sp: _snets[nn] for (sp, _sb, nn) in _SDRAM_MAP}
 
 # _som_kw accumulates every SOM ball-port connection across subsystems (one big ball pool;
@@ -243,7 +279,9 @@ _HSPI_MAP = [
     ("PA18", "SOM_T21", "HSPI_HRACK"),
     ("PA6", "SOM_T20", "HSPI_HRVLD"),
 ]
-_hnets = {nn: Net(nn) for (_p, _b, nn) in _HSPI_MAP}
+# 50R single-ended, impedance-controlled: HSPI is a fast source-synchronous SDR bus (feeds the USB3
+# wall). Tag all 40 nets (data + the two GCLK clocks + handshake) to "50Ohm SE".
+_hnets = {nn: Net(nn, impedance=Impedance(50)) for (_p, _b, nn) in _HSPI_MAP}
 _som_kw.update({b: _hnets[nn] for (_p, b, nn) in _HSPI_MAP})
 _hspi_ch_kw = {"CH_" + p: _hnets[nn] for (p, _b, nn) in _HSPI_MAP}
 

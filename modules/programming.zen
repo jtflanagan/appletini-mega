@@ -14,6 +14,8 @@ the top maps onto SOM balls; rails are shared ports. Other FT2232 GPIO stay loca
 NOTE: USB-C = TYPE-C-31-M-12 (16-pin, USB2) — correct for FT2232H (USB2 only).
 """
 
+load("@stdlib/units.zen", "Impedance")
+
 Resistor = Module("@stdlib/generics/Resistor.zen")
 Capacitor = Module("@stdlib/generics/Capacitor.zen")
 Crystal = Module("@stdlib/generics/Crystal.zen")
@@ -39,8 +41,8 @@ def _ftio(nm):
 _OSCI = Net("FT_OSCI")
 _OSCO = Net("FT_OSCO")
 _REF = Net("FT_REF")
-_DP = Net("USB_FT_DP")
-_DM = Net("USB_FT_DM")
+_DP = Net("USB_FT_DP", impedance=Impedance(90))  # USB2 HS D+ -> "90Ohm Diff" netclass
+_DM = Net("USB_FT_DM", impedance=Impedance(90))  # USB2 HS D-
 _EECLK = Net("FT_EECLK")
 _EECS = Net("FT_EECS")
 _EEDATA = Net("FT_EEDATA")
