@@ -17,7 +17,7 @@ intended floorplan positions live in docs/board_floorplan.md "Concrete floorplan
 
 Also draws the board outline + finger tab (body = 152.4x69.85 mm rectangle with a
 38.1x12.7 mm notch cut from the upper-right corner; the 2.55" tab protrudes ~7.5 mm
-below, the AppleIIBus_Edge slot J2 filling a gap in the bottom edge). Coordinate
+below, the AppleIIBus_Edge slot (found by footprint) filling a gap in the bottom edge). Coordinate
 frame = KiCad native (origin top-left, +y DOWN, mm); the whole board is shifted by
 ORIGIN so the body rectangle is centred on the A4-landscape sheet.
 
@@ -389,7 +389,12 @@ def compute():
     som_rot = {"CN1": 270}
     for r, (dx, dy) in {"CN1": (-19.85, 0), "CN2": (-6.47, -14.67), "CN3": (-6.47, 14.74)}.items():
         place[r] = (SOM_DATUM_X + dx, BH / 2 + dy, som_rot.get(r))
-    place["J2"] = (TAB_X, BH + TAB_TOP)          # slot: forms the tab in the outline
+    # slot: forms the tab in the outline. Find it by FOOTPRINT, not a hardcoded refdes -- the
+    # J-series renumbers when J_CPU changes part class (e.g. the 2x20 header -> FPC connector moved
+    # the AppleIIBus_Edge slot from J2 to J1), same dynamic pattern as the barrel jack below.
+    slot = next((r for r, n in fpname.items() if "APPLEIIBUS" in n.upper()), None)
+    if slot:
+        place[slot] = (TAB_X, BH + TAB_TOP)
     # SOM mounting holes: 41x31mm rectangle on the SAME datum as CN1-3 (som_placement.md /
     # the SOM mechanical drawing). Placed by instance name -> ref so they track the BTB
     # connectors under any SOM move. +x right, +y down; datum = hole-rect centre.
