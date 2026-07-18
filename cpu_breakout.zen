@@ -17,8 +17,9 @@ underside into the socket; J_FFC sits on top), with pins long enough to seat ful
 LAYOUT: place J_DIP_L as the left column (P1 at the pin-1/notch corner, running down to P20), and
 J_DIP_R as the right column rotated 180deg so its P1 (=DIP 21) sits at the bottom next to J_DIP_L.P20
 -- the standard DIP pin wrap (1..20 down the left, 21..40 up the right).
-FAB NOTE: the generic PinHeader footprint drills ~1.0 mm holes (sized for square pins); tighten to
-suit the chosen turned-pin strip (~0.7-0.8 mm) before release.
+PART: BOOMELE C9742, a 2.54 mm 1x40 GOLD ROUND-pin strip, cut into two 20s (see the J_DIP_* note).
+FAB NOTE: the generic PinHeader footprint drills ~1.0 mm holes -- generous for C9742's ~0.5 mm round
+pins but solders fine; tighten toward ~0.7 mm if a fab prefers.
 
 Electrically the breakout only adds a short passive stub (cable + fan-out traces); negligible on the
 1-2.8 MHz CPU bus (see docs/cpu_socket_pinout.md).
@@ -47,13 +48,19 @@ for (pin, role, _dir, _note) in CPU_PINMAP:
 FH12(name="J_FFC", MH1=GND, MH2=GND, **{"P%d" % pin: _net[pin] for (pin, _r, _d, _n) in CPU_PINMAP})
 
 # ---- DIP-40 plug: two 1x20 machined round-pin strips, 0.6" apart (see header note) ----
+# PART: BOOMELE C9742 -- 2.54 mm 1x40P GOLD ROUND-pin male header (the turned-pin type whose ~0.5 mm
+# round pins seat in a DIP socket's round receptacles; gold for repeated insertion). Bought as a 1x40
+# break-away strip and cut into two 20s, hand-soldered bottom-side. The generic PinHeader footprint's
+# 1.0 mm drill is generous for a 0.5 mm pin but solders fine; tighten toward ~0.7 mm if a fab wants it.
+_DIP_MPN = "C9742"
+_DIP_MFR = "BOOMELE(Boom Precision Elec)"
 PinHeader(
     name="J_DIP_L",  # left column = DIP pins 1..20 (top -> bottom)
-    pins=20, rows=1, mount="THT", pitch="2.54mm", gender="Male",
+    pins=20, rows=1, mount="THT", pitch="2.54mm", gender="Male", mpn=_DIP_MPN, manufacturer=_DIP_MFR,
     **{"P%d" % i: _net[i] for i in range(1, 21)},
 )
 PinHeader(
     name="J_DIP_R",  # right column = DIP pins 21..40 (P_i -> DIP 20+i; placed 180deg, bottom = DIP21)
-    pins=20, rows=1, mount="THT", pitch="2.54mm", gender="Male",
+    pins=20, rows=1, mount="THT", pitch="2.54mm", gender="Male", mpn=_DIP_MPN, manufacturer=_DIP_MFR,
     **{"P%d" % i: _net[20 + i] for i in range(1, 21)},
 )
