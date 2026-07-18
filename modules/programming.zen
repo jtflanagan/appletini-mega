@@ -18,7 +18,7 @@ Resistor = Module("@stdlib/generics/Resistor.zen")
 Capacitor = Module("@stdlib/generics/Capacitor.zen")
 Crystal = Module("@stdlib/generics/Crystal.zen")
 FT2232 = Module("../components/FTDI/FT2232HQ-TRAY/FT2232HQ-TRAY.zen")
-EEPROM = Module("../components/Microchip_Technology/93LC56_P/93LC56_P.zen")
+EEPROM = Module("../components/Microchip_Technology/93LC56B-I_SN/93LC56B-I_SN.zen")  # SOIC-8, fixed x16
 USBC = Module("../components/Korean_Hroparts_Elec/TYPE-C-31-M-12/TYPE-C-31-M-12.zen")
 
 GND = io("GND", Ground)  # shared board ground (top-level owns it)
@@ -115,7 +115,7 @@ Capacitor(name="C_FT_X1", value="18pF", package="0402", P1=_OSCI, P2=GND.NET)
 Capacitor(name="C_FT_X2", value="18pF", package="0402", P1=_OSCO, P2=GND.NET)
 
 # ---- 93LC56 config EEPROM ----
-EEPROM(name="U_EE", CS=_EECS, CLK=_EECLK, DI=_EEDATA, DO=_EEDO, ORG=P3V3.NET, VCC=P3V3.NET, VSS=GND, NU=Net("EE_NU"))
+EEPROM(name="U_EE", CS=_EECS, CLK=_EECLK, DI=_EEDATA, DO=_EEDO, ORG=P3V3.NET, VCC=P3V3.NET, VSS=GND)  # ORG=VCC -> x16 (FTDI); pin7 NC omitted
 Resistor(name="R_EE", value="2.2kohm", package="0402", P1=_EEDO, P2=_EEDATA)  # DO -> EEDATA (half-duplex)
 
 # ---- USB-C (data-only) ----

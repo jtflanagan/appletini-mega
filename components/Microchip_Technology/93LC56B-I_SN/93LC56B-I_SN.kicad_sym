@@ -2,45 +2,36 @@
 	(version 20251024)
 	(generator "kicad_symbol_editor")
 	(generator_version "10.0")
-	(symbol "93LC56_P_C1350185"
+	(symbol "93LC56B-I_SN"
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(in_pos_files yes)
 		(duplicate_pin_numbers_are_jumpers no)
-		(property "Reference" "U"
-			(at 0 8.89 0)
+		(property "Reference" "IC"
+			(at 21.59 7.62 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(justify left top)
 			)
 		)
-		(property "Value" "93LC56/P_C1350185"
-			(at 0 -8.89 0)
+		(property "Value" "93LC56B-I_SN"
+			(at 21.59 5.08 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(justify left top)
 			)
 		)
-		(property "Footprint" "93LC56_P"
-			(at 0 -11.43 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "docs/93LC56_P.pdf"
-			(at 0 -13.97 0)
+		(property "Footprint" "93LC56B-I_SN"
+			(at 21.59 -94.92 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(hide yes)
@@ -48,9 +39,22 @@
 				(font
 					(size 1.27 1.27)
 				)
+				(justify left top)
 			)
 		)
-		(property "Description" ""
+		(property "Datasheet" "http://ww1.microchip.com/downloads/en/DeviceDoc/21794G.pdf"
+			(at 21.59 -194.92 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Description" "2K,128 X 16,Serial EE,SOIC-8"
 			(at 0 0 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -61,8 +65,8 @@
 				)
 			)
 		)
-		(property "Manufacturer" "MICROCHIP(美国微芯)"
-			(at 0 -16.51 0)
+		(property "Height" "1.75"
+			(at 21.59 -394.92 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(hide yes)
@@ -70,87 +74,96 @@
 				(font
 					(size 1.27 1.27)
 				)
-			)
-		)
-		(property "MPN" "93LC56/P"
-			(at 0 -19.05 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC Part" "C1350185"
-			(at 0 -21.59 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "ki_keywords" "Pre-ordered Chips"
-			(at 0 0 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(hide yes)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
+				(justify left top)
 			)
 		)
 		(property "Manufacturer_Name" "Microchip Technology"
-			(at 0 0 0)
+			(at 21.59 -494.92 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
 				(justify left top)
-				(hide yes)
 			)
 		)
-		(property "Manufacturer_Part_Number" "93LC56/P"
-			(at 0 0 0)
+		(property "Manufacturer_Part_Number" "93LC56B-I/SN"
+			(at 21.59 -594.92 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
 				(justify left top)
-				(hide yes)
 			)
 		)
-		(symbol "93LC56_P_C1350185_0_1"
+		(property "Mouser Part Number" "579-93LC56BISN"
+			(at 21.59 -694.92 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Microchip-Technology/93LC56B-I-SN?qs=JhC4kYev1ubTO3jC60ECfA%3D%3D"
+			(at 21.59 -794.92 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Arrow Part Number" "93LC56B-I/SN"
+			(at 21.59 -894.92 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Arrow Price/Stock" "https://www.arrow.com/en/products/93lc56b-isn/microchip-technology?utm_currency=USD&region=nac"
+			(at 21.59 -994.92 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(symbol "93LC56B-I_SN_1_1"
 			(rectangle
-				(start -6.35 6.35)
-				(end 6.35 -6.35)
+				(start 5.08 2.54)
+				(end 20.32 -10.16)
 				(stroke
-					(width 0)
+					(width 0.254)
 					(type default)
 				)
 				(fill
 					(type background)
 				)
 			)
-			(circle
-				(center -5.08 5.08)
-				(radius 0.38)
-				(stroke
-					(width 0)
-					(type default)
-				)
-				(fill
-					(type none)
-				)
-			)
-			(pin unspecified line
-				(at -8.89 3.81 0)
-				(length 2.54)
+			(pin passive line
+				(at 0 0 0)
+				(length 5.08)
 				(name "CS"
 					(effects
 						(font
@@ -166,9 +179,9 @@
 					)
 				)
 			)
-			(pin unspecified line
-				(at -8.89 1.27 0)
-				(length 2.54)
+			(pin passive line
+				(at 0 -2.54 0)
+				(length 5.08)
 				(name "CLK"
 					(effects
 						(font
@@ -184,9 +197,9 @@
 					)
 				)
 			)
-			(pin unspecified line
-				(at -8.89 -1.27 0)
-				(length 2.54)
+			(pin passive line
+				(at 0 -5.08 0)
+				(length 5.08)
 				(name "DI"
 					(effects
 						(font
@@ -202,9 +215,9 @@
 					)
 				)
 			)
-			(pin unspecified line
-				(at -8.89 -3.81 0)
-				(length 2.54)
+			(pin passive line
+				(at 0 -7.62 0)
+				(length 5.08)
 				(name "DO"
 					(effects
 						(font
@@ -220,9 +233,9 @@
 					)
 				)
 			)
-			(pin unspecified line
-				(at 8.89 -3.81 180)
-				(length 2.54)
+			(pin passive line
+				(at 25.4 -7.62 180)
+				(length 5.08)
 				(name "VSS"
 					(effects
 						(font
@@ -238,9 +251,9 @@
 					)
 				)
 			)
-			(pin unspecified line
-				(at 8.89 -1.27 180)
-				(length 2.54)
+			(pin passive line
+				(at 25.4 -5.08 180)
+				(length 5.08)
 				(name "ORG"
 					(effects
 						(font
@@ -256,10 +269,10 @@
 					)
 				)
 			)
-			(pin unspecified line
-				(at 8.89 1.27 180)
-				(length 2.54)
-				(name "NU"
+			(pin no_connect line
+				(at 25.4 -2.54 180)
+				(length 5.08)
+				(name "NC"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -274,9 +287,9 @@
 					)
 				)
 			)
-			(pin unspecified line
-				(at 8.89 3.81 180)
-				(length 2.54)
+			(pin passive line
+				(at 25.4 0 180)
+				(length 5.08)
 				(name "VCC"
 					(effects
 						(font

@@ -1,0 +1,19 @@
+"""
+93LC56B-I_SN
+
+Auto-generated using `pcb search`.
+"""
+
+CLK = io(Net)
+CS = io(Net)
+DI = io(Net)
+DO = io(Net)
+ORG = io(Net)
+VCC = io(Net)
+VSS = io(Net)
+
+Component(
+    name="93LC56B-I_SN",
+    symbol=Symbol(library="93LC56B-I_SN.kicad_sym"),
+    pins={"CLK": CLK, "CS": CS, "DI": DI, "DO": DO, "ORG": ORG, "VCC": VCC, "VSS": VSS},
+)
