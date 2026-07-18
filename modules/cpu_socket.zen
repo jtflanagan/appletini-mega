@@ -103,7 +103,7 @@ OdInv = Module(
 
 GND = io("GND", Ground)  # shared board ground (top-level owns it)
 P3V3 = io("P3V3", Power)  # carrier 3.3 V -> all VCCA (shared rail from power module)
-SKT_5V = Net("SKT_5V")  # host socket 5 V (DIP pin 8) -> all VCCB, pull-ups, divider
+SKT_5V = io("SKT_5V", Net, optional=True) or Net("SKT_5V")  # host socket 5 V (DIP pin 8) -> all VCCB, pull-ups, divider; EXPORTED so power.zen can gate the bucks on host power
 # NOTE: host-side (arrives via ribbon pin 8), NOT a carrier rail -> stays local
 
 

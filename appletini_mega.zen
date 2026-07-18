@@ -103,6 +103,9 @@ Board(
 GND = Ground()
 P5V = Power("P5V")  # VBUS_SOM 5V (buck output) -> SOM P5V pins
 P3V3 = Power("P3V3")  # 3.3V (LDO output) -> logic + VCCIO + IC rails
+# Host socket 5 V: SOURCED at the CPU socket (DIP pin 8), CONSUMED by the power module to gate the
+# buck EN pins (carrier stays dark until the Apple is powered). Not a carrier rail -- a host input.
+SKT_5V = Net("SKT_5V")
 
 # ============================================================================
 # SDRAM pilot wiring: (sdram_port, som_ball, functional_net) triples.
@@ -315,7 +318,7 @@ _prog_kw = {p: _jnets[nn] for (p, _b, nn) in _JTU_MAP}
 # ============================================================================
 # Instantiate subsystems with rails wired. Signals wired: SDRAM + HSPI. Apple/JTAG next.
 # ============================================================================
-PowerMod(name="PWR", GND=GND, P5V=P5V, P3V3=P3V3)
+PowerMod(name="PWR", GND=GND, P5V=P5V, P3V3=P3V3, HOST_5V=SKT_5V)
 
 SomBtb(
     name="SOM",
@@ -332,5 +335,5 @@ Sdram(name="SDRAM", GND=GND, VDD=P3V3, **_sdram_kw)
 
 Programming(name="PROG", GND=GND, P3V3=P3V3, **_prog_kw)
 Usb3Bridge(name="USB3", GND=GND, P3V3=P3V3, **_hspi_ch_kw)
-CpuSocket(name="CPU", GND=GND, P3V3=P3V3, **_cpu_kw)
+CpuSocket(name="CPU", GND=GND, P3V3=P3V3, SKT_5V=SKT_5V, **_cpu_kw)
 Mechanical(name="MECH")
