@@ -25,11 +25,12 @@ DESIGN DECISIONS (resolved 2026-07-08):
 The carrier replaces the host CPU: a soft CPU in the GW5AT-60 drives the Apple II/IIgs bus
 through the vacated CPU socket. Physical path:
 
-    FPGA (BTB, 3.3 V)  ->  LXC translators  ->  100 R series  ->  2x20 0.1" header (J_CPU)
-                                                                    -> ribbon -> DIP-40 plug -> host CPU socket
+    FPGA (BTB, 3.3 V)  ->  LXC translators  ->  100 R series  ->  40-pos 0.5mm FFC (J_CPU, FH12-40S)
+                                          -> FFC ribbon -> socket-side breakout (cpu_breakout.zen) -> DIP-40 plug -> host CPU socket
 
-The 2x20 header carries the SOCKET side (5 V domain); header pin N = DIP pin N (1:1), see
-docs/cpu_socket_pinout.md for the 3-part pinout and the header<->DIP numbering note.
+J_CPU carries the SOCKET side (5 V domain); FFC pin N = DIP pin N (1:1), generated from the shared
+modules/cpu_ffc_map.zen so the carrier and the breakout can't drift. See docs/cpu_socket_pinout.md
+for the 3-part pinout and the FFC<->DIP numbering / keying note.
 
 LEVEL-SHIFT CONVENTION (all SN74LXC8T245 / SN74LXC1T45):
   A side = FPGA (3.3 V, VCCA = P3V3).  B side = socket (5 V, VCCB = SKT_5V).
@@ -90,9 +91,14 @@ ports; the top maps them onto SOM balls (the 1-2.8 MHz Apple bus is the most for
 Passive values are sensible starting points.
 """
 
+load("cpu_ffc_map.zen", "CPU_PINMAP")  # single source of truth for CPU-socket pin order (shared w/ cpu_breakout.zen)
+
 Resistor = Module("@stdlib/generics/Resistor.zen")
 Capacitor = Module("@stdlib/generics/Capacitor.zen")
-PinHeader = Module("@stdlib/generics/PinHeader.zen")
+# J_CPU = 40-pos 0.5 mm bottom-contact FFC (Hirose FH12-40S-0.5SH(55), LCSC C202114). Was a 2x20 pin
+# header; now an FPC connector -> FFC ribbon -> socket-side breakout board -> DIP-40 plug in the host
+# CPU socket (see cpu_breakout.zen). The FFC ecosystem is the RPi 40-pin GPIO ribbon form factor.
+FH12 = Module("../components/HRS_Hirose/FH12-40S-0_5SH_55/FH12-40S-0_5SH_55.zen")
 
 Xcvr8 = Module("../components/Texas_Instruments/SN74LXC8T245PWR/SN74LXC8T245PWR.zen")
 Xcvr1 = Module("../components/Texas_Instruments/SN74LXC1T45DBVR/SN74LXC1T45DBVR.zen")
@@ -292,55 +298,33 @@ Capacitor(name="C_BULK_5V", value="1uF", package="0603", P1=SKT_5V, P2=GND.NET)
 Capacitor(name="C_BULK_3V3", value="1uF", package="0603", P1=P3V3.NET, P2=GND.NET)
 
 # ============================================================================
-# 2x20 0.1" header J_CPU  (header pin N = DIP pin N; ribbon -> DIP-40 plug in the socket)
-# NOTE: only DIP pin 21 is a guaranteed ground return (as on a real 6502). Interleaving
-# extra grounds in the ribbon would require breaking the 1:1 mapping -- see the doc.
+# J_CPU: 40-pos 0.5 mm bottom-contact FFC connector (Hirose FH12-40S-0.5SH), pins generated from
+# the shared CPU_PINMAP so that FFC pin N == DIP pin N. The socket-side breakout (cpu_breakout.zen)
+# builds its matching FFC + DIP-40 end from the SAME map, so the two ends cannot drift.
+# NOTE: only DIP pin 21 (VSS) is a guaranteed ground return (as on a real 6502) -- we keep the
+# cable 40-pin (RPi-GPIO form factor), so there are no interleaved grounds; fine at 1-2.8 MHz.
+# Keying is by FFC contact-side convention (bottom-contact part + same-side cable), not a shroud.
+# MH1/MH2 = the connector's mechanical solder tabs -> GND (retention + shield).
 # ============================================================================
-PinHeader(
-    name="J_CPU",
-    pins=20,
-    rows=2,
-    mount="THT",
-    pitch="2.54mm",
-    gender="Male",
-    P1=SKT_O["VPB"],  # DIP1  VPB(CMOS out, driven) / GND(6502; firmware holds VPB low)
-    P2=SKT_I["RDY"],  # DIP2  RDY
-    P3=SKT_P3,  # DIP3  phi1-out(6502) / ABORTB(816) -- flip
-    P4=SKT_I["IRQ"],  # DIP4  /IRQ
-    P5=SKT_O["MLB"],  # DIP5  MLB (NC on 6502)
-    P6=SKT_I["NMI"],  # DIP6  /NMI
-    P7=SKT_O["SYNC_VPA"],  # DIP7  SYNC(6502/02) / VPA(816)
-    P8=SKT_5V,  # DIP8  VDD = host 5 V (powers all VCCB)
-    P9=SKT_A[0],
-    P10=SKT_A[1],
-    P11=SKT_A[2],
-    P12=SKT_A[3],
-    P13=SKT_A[4],
-    P14=SKT_A[5],
-    P15=SKT_A[6],
-    P16=SKT_A[7],
-    P17=SKT_A[8],
-    P18=SKT_A[9],
-    P19=SKT_A[10],
-    P20=SKT_A[11],
-    P21=GND,  # DIP21 VSS = ground return to host
-    P22=SKT_A[12],
-    P23=SKT_A[13],
-    P24=SKT_A[14],
-    P25=SKT_A[15],
-    P26=SKT_D[7],
-    P27=SKT_D[6],
-    P28=SKT_D[5],
-    P29=SKT_D[4],
-    P30=SKT_D[3],
-    P31=SKT_D[2],
-    P32=SKT_D[1],
-    P33=SKT_D[0],
-    P34=SKT_O["RW"],  # DIP34 R/W
-    P35=SKT_O["E"],  # DIP35 E (816; NC on 6502/02)
-    P36=SKT_I["BE"],  # DIP36 BE (NC on 6502)
-    P37=SKT_I["PHI2"],  # DIP37 phi0/PHI2 clock in
-    P38=SKT_P38,  # DIP38 SO(6502/02) / MX(816) -- flip
-    P39=SKT_O["PHI2O_VDA"],  # DIP39 phi2-out(6502/02) / VDA(816)
-    P40=SKT_I["RES"],  # DIP40 /RES (sensed + deadman-driven)
-)
+def _role_net(role):
+    """Resolve a CPU_PINMAP role token to this carrier's socket-side (SKT_*) net."""
+    if role in SKT_O:
+        return SKT_O[role]
+    if role in SKT_I:
+        return SKT_I[role]
+    if role == "P3":
+        return SKT_P3
+    if role == "P38":
+        return SKT_P38
+    if role == "VDD":
+        return SKT_5V
+    if role == "VSS":
+        return GND.NET
+    if role.startswith("A"):
+        return SKT_A[int(role[1:])]
+    if role.startswith("D"):
+        return SKT_D[int(role[1:])]
+    error("cpu_ffc_map: unresolved role '" + role + "'")
+
+_jcpu_pins = {"P%d" % pin: _role_net(role) for (pin, role, _dir, _note) in CPU_PINMAP}
+FH12(name="J_CPU", MH1=GND.NET, MH2=GND.NET, **_jcpu_pins)

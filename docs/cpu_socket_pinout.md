@@ -1,9 +1,11 @@
 # CPU socket connector — 6502 / 65C02 / 65C816 pinouts
 
 The carrier interfaces to the target Apple II/IIgs by **replacing its CPU**: a soft CPU in the
-GW5AT-60 drives the machine's bus through the vacated CPU socket. Physically that is a **2×20
-0.1″ (2.54 mm) header on the carrier → ribbon cable → a 40-pin DIP plug** seated in the host's
-CPU socket.
+GW5AT-60 drives the machine's bus through the vacated CPU socket. Physically that is a **40-position
+0.5 mm FFC connector on the carrier (`J_CPU`, Hirose FH12-40S-0.5SH) → 40-conductor FFC ribbon →
+a socket-side breakout board (`cpu_breakout.zen`) → 40-pin DIP plug** seated in the host's CPU
+socket. FFC pin N is wired straight to DIP pin N; the shared list `modules/cpu_ffc_map.zen` is the
+single source of truth both the carrier and the breakout build from, so the two ends cannot drift.
 
 All three target CPUs share the **same 40-pin DIP footprint** (0.6″ row spacing), so one socket
 adapter serves any of them. What differs is the *function* of a handful of pins — WDC's CMOS parts
@@ -138,25 +140,33 @@ column above). This is what drives shifter part choice and the ~40-pin Apple-bus
 Approx budget at the socket itself: **16 addr + 8 data + R/W + clock + 4 interrupt/reset/ready ≈ 30
 mandatory**, the rest of the "~40 Apple bus" count in the plan comes from slot-side control lines.
 
-## 2×20 header ↔ DIP-40 numbering (design decision, TODO at layout)
+## FFC ↔ DIP-40 numbering & keying (settled: FFC + breakout, 1:1)
 
-A 2×20 0.1″ header does **not** number like a DIP. Two conventions must be reconciled:
+The interface is **1:1 by construction**: carrier `J_CPU` FFC pin N → FFC ribbon → breakout `J_FFC`
+pin N → breakout DIP plug pin N → host DIP pin N. Both ends are generated from the same ordered list
+in `modules/cpu_ffc_map.zen`, so there is no adapter-wiring ambiguity to reconcile and no way for the
+two connectors to disagree — edit the map and both boards regenerate.
 
-- **DIP-40:** pins 1→20 down one side, 21→40 up the other (pin 40 opposite pin 1).
-- **2×20 shrouded IDC header:** pin 1 at the keyed corner, then it alternates row-to-row —
-  odd pins (1,3,…,39) in one row, even pins (2,4,…,40) in the other. A ribbon + IDC-to-DIP
-  adapter carries this straight through only if the adapter is built for it.
+- **DIP-40 (host socket):** pins 1→20 down one side, 21→40 up the other (pin 40 opposite pin 1). The
+  breakout realizes this with **two 1×20 machined round-pin strips 0.6″ apart** (left = DIP 1–20,
+  right = DIP 21–40) — that pin field *is* the DIP-40 footprint. Round/turned pins are required so the
+  strips seat properly in the socket's round receptacles.
+- **FFC (both connector ends):** a single row of 40 contacts, no row-alternation to reconcile — the
+  numbering is linear, so "pin N = pin N" holds trivially end to end.
 
-**Recommendation:** define the carrier header so **header pin N = DIP pin N (1:1)**, and pick/spec
-a DIP-40 ribbon adapter (e.g. an IDC-to-DIP "clip" or a machined DIP plug on ribbon) whose wiring
-realizes that mapping. Document the exact adapter part before committing copper — a mismatch here
-silently swaps address/data lines. Add a **pin-1 key** on the shrouded header and a keyed cable to
-make backwards insertion impossible. This is deferred to the layout/wiring phase.
+**Keying (backwards-insertion protection).** An FPC connector has no shroud, so keying is by the
+**FFC contact-side convention**, not a slot: the FH12-40S is a **bottom-contact** part, so a
+same-side-contact cable of the correct type only mates one way up, and flipping it end-for-end is
+prevented by the connector positions / cable ears. Spec the cable's contact side and length to match
+both connectors before committing the cable — a mis-sided or reversed cable silently swaps every line.
+(Earlier drafts proposed a 2×20 shrouded IDC header with a pin-1 key; that was dropped in favor of the
+FFC + breakout for a far smaller carrier footprint and easier threading to the socket — see
+`docs/board_floorplan.md`.)
 
 ## Level-shifter chip allocation (implemented in `modules/cpu_socket.zen`)
 
 The carrier *is* the CPU: a soft CPU in the GW5AT-60 drives the socket through
-`FPGA (3.3 V) → LXC translators → 100 Ω series → 2×20 header → ribbon → DIP-40 plug`. All
+`FPGA (3.3 V) → LXC translators → 100 Ω series → J_CPU FFC → ribbon → breakout → DIP-40 plug`. All
 translation uses **SN74LXC8T245** octal transceivers (genuine dual-supply — cannot use plain
 single-rail LVC245, which won't output true 5 V) plus two **SN74LXC1T45** single-bit parts for
 the direction-flip pins.

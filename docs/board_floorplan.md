@@ -168,15 +168,17 @@ of cable egress.
   top strip the Apple-bus block needs. (The vertical/90°-rotated alternative gives the cleanest
   two-sided SDRAM escape but leaves only ~13 mm at the top and forces USB onto the top edge — not
   worth it, since SDRAM is the *most forgiving* bus and shouldn't drive the floorplan.)
-- **Machine-facing end = TOP edge, center.** The 2×20 CPU-ribbon header sits on the **top long edge**
-  (opposite the slot fingers) and the ribbon drops over the top toward the //e CPU socket. Leaves both
-  short ends free for the power↔USB spine.
+- **Machine-facing end = TOP edge, center.** The CPU-socket link `J_CPU` — a **40-pos 0.5 mm FFC
+  connector** (Hirose FH12-40S; was a 2×20 ribbon header) — sits toward the machine-facing edge; the
+  flat FFC threads to the //e CPU socket via the socket-side breakout board (`cpu_breakout.zen`). At
+  ~24 mm and low-profile it takes far less edge length than the old ~51 mm header and frees both short
+  ends for the power↔USB spine. (v2 below moves it low/right near the slot — see that section.)
 - **SOM mounting face = TOP of the carrier (LOCKED).** Apple II cards project **upward** out of the
   slot with a **consistent component side** (each card's tall face looks at the next card's bare back),
   so the ~1″ //e slot pitch easily clears a one-sided ~8–10 mm SOM stack. → **Top-mount** the SOM (and
   every tall part). This keeps inner/outer rows exactly as documented in `som_placement.md` (a
   bottom-mount mirror would flip them and lose the SDRAM1-escapes-outward geometry). **Design rule:**
-  all tall parts (SOM, barrel jack, USB-C, 2×20 header, electrolytics) on the **top/component face**;
+  all tall parts (SOM, barrel jack, USB-C, electrolytics) on the **top/component face**;
   **bottom face = low-profile SMD only** (min profile — small decoupling may still tuck under the SOM in
   the ~3 mm standoff gap).
 
@@ -252,7 +254,7 @@ Working frame: **origin = bottom-left, +x right, +y up, mm.** Board = `(0,0)…(
         │ ├──────────┤   0  └───────────────────┘   ┌ SDRAM1 → C2400 ┐   │  CPU skt)
  ~18    │ │ FT2232   │   0  C2400(bot) ▁▁▁▁▁▁▁▁▁    │  (AS4C16M16)   │   │
         │ │ USB-C ►  │                              └────────────────┘   │
- ~13    │ └──────────┘   ┌═ 2×20 CPU HEADER (horiz, near slot) ═┐         │
+ ~13    │ └──────────┘   ┌═ CPU FFC J_CPU (FH12-40S, near slot) ═┐        │
  ~12    │ · · · · · · · · · · · finger keep-out · · · · · · · · · · · · · ·│
  y0     └═════════════════[ slot fingers, bottom edge ]═══════════════════┘
        x0  ← left: power + the two BTB9900 bridges          right: SDRAM + glue →  x152.4
@@ -272,14 +274,16 @@ Working frame: **origin = bottom-left, +x right, +y up, mm.** Board = `(0,0)…(
 | **SDRAM U_LO** (→ C2399) | ~100 – 126 | ~38 – 52 | Upper-right, against C2399 (top). Data+DQM bank-local BANK1/2 (+2 borrowed BANK4); sources the shared cmd/clk/addr bus. |
 | **SDRAM U_HI** (→ C2400) | ~100 – 126 | ~16 – 30 | Lower-right, against C2400 (bottom). Data+DQM bank-local BANK6/7/8; shared bus arrives from U_LO/C2399 — keep the two devices vertically close to bound the shared-bus stubs. |
 | **Apple glue** (5×'245, 2×'T45, deadman) | ~126 – 150 | ~16 – 55 | Far right, past the SDRAMs. A-side ← FPGA GPIO on C2400 spill. |
-| **2×20 CPU header** | ~95 – 146 | ~13 – 19 | **Horizontal, low/right near the slot** — ribbon drops toward the //e CPU socket. |
+| **CPU FFC `J_CPU`** | ~100 – 124 | ~13 – 19 | FH12-40S (~24 mm, low-profile), **low/right near the slot** — flat FFC exits toward the //e CPU socket via the breakout board. |
 | **Slot fingers** | ~78 – 143 | 0 – ~2 | Bottom edge (tab centre 110.49). Floating (mechanical only). |
 
 **Change vs v1 / open at KiCad time:**
-- USB/bridges moved **right → left**; SDRAM moved **mouth → clean right field**; CPU header moved
-  from the **top edge** (v1 lock) to **horizontal near the slot** — this revises the v1 "machine-facing
-  end = top edge" note; the ribbon now exits low toward the motherboard CPU socket. Confirm the ribbon
-  reach and that the header/glue clear the finger keep-out (y≲12).
+- USB/bridges moved **right → left**; SDRAM moved **mouth → clean right field**; CPU link moved
+  from the **top edge** (v1 lock) to **low/right near the slot** — this revises the v1 "machine-facing
+  end = top edge" note; the flat FFC now exits low toward the motherboard CPU socket (via the
+  socket-side breakout board). The connector is now a 40-pos 0.5 mm FFC (`J_CPU`, FH12-40S) — ~24 mm and
+  low-profile, so it no longer dominates the edge or counts as a tall part. Confirm the FFC reach and
+  that the connector/glue clear the finger keep-out (y≲12).
 - "SDRAM0 near C2 / SDRAM1 near C1" (as stated) is read as U_LO↔C2399(top), U_HI↔C2400(bottom) —
   the *data*+DQM halves are forced by bank locality (U_LO=BANK1/2, U_HI=BANK6/7/8), matching the
   wiring in `appletini_mega.zen`. As of 2026-07-10 the two are one 32-bit bank on a shared

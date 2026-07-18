@@ -16,6 +16,7 @@ description = "Apple II/IIgs accelerator carrier board for a Sipeed Tang Mega 60
 "github.com/jtflanagan/appletini-mega/components/FTDI/FT2232HQ-TRAY" = "0.1.0"
 "github.com/jtflanagan/appletini-mega/components/HRS_Hirose/DF40C-100DS-0_4V_51" = "0.1.0"
 "github.com/jtflanagan/appletini-mega/components/HRS_Hirose/DF40C-80DS-0_4V_51" = "0.1.0"
+"github.com/jtflanagan/appletini-mega/components/HRS_Hirose/FH12-40S-0_5SH_55" = "0.1.0"
 "github.com/jtflanagan/appletini-mega/components/JLCPCB_Assembly/POWER-JACK" = "0.1.0"
 "github.com/jtflanagan/appletini-mega/components/JLCPCB_Assembly/type-c24p" = "0.1.0"
 "github.com/jtflanagan/appletini-mega/components/Jiangsu_Changjing_Electronics_Technology_Co_Ltd/2N7002" = "0.1.0"

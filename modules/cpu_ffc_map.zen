@@ -1,0 +1,66 @@
+"""
+cpu_ffc_map — the single source of truth for the CPU-socket interface pin order.
+
+The carrier reaches the host CPU socket over a 40-conductor 0.5 mm FFC:
+
+    carrier FH12-40S FFC (J_CPU)  ->  FFC ribbon  ->  socket-side breakout board  ->  DIP-40 plug
+
+The mapping is a straight **1:1**: FFC pin N == breakout DIP-plug pin N == host CPU DIP pin N.
+Both boards (the carrier `cpu_socket.J_CPU` and `cpu_breakout.zen`) build their connector pin
+assignments from THIS list, so the two ends can never silently drift out of agreement -- renumber
+a pin here and both regenerate together.
+
+We deliberately keep it 40-pin (no interleaved grounds): the 40-pos 0.5 mm FFC ecosystem is the
+Raspberry Pi GPIO ribbon form factor, so cables/connectors are cheap and ubiquitous. That leaves the
+single VSS (pin 21) return of the real 6502 DIP as-is -- fine for a 1-2.8 MHz synchronous bus (see
+docs/cpu_socket_pinout.md). Keying is by FFC contact-side convention (bottom-contact FH12 + a
+same-side cable), NOT a shroud, since an FPC connector has no shroud slot.
+
+Each entry: (dip_pin, role, direction, note). `role` is the canonical token both boards resolve to
+their own net; `direction` is from the CPU's perspective (out = CPU drives, in = CPU listens,
+pwr/gnd = rail). Matches the WDC DIP-40 pinout in docs/cpu_socket_pinout.md.
+"""
+
+# dip_pin, role, direction, note
+CPU_PINMAP = [
+    (1, "VPB", "out", "VPB (CMOS out) / GND on NMOS 6502"),
+    (2, "RDY", "in", "RDY"),
+    (3, "P3", "flip", "phi1-out (6502) / ABORTB (816) -- direction flips"),
+    (4, "IRQ", "in", "/IRQ"),
+    (5, "MLB", "out", "MLB (NC on 6502)"),
+    (6, "NMI", "in", "/NMI"),
+    (7, "SYNC_VPA", "out", "SYNC (6502/02) / VPA (816)"),
+    (8, "VDD", "pwr", "VDD = host socket 5 V (powers all VCCB)"),
+    (9, "A0", "out", ""),
+    (10, "A1", "out", ""),
+    (11, "A2", "out", ""),
+    (12, "A3", "out", ""),
+    (13, "A4", "out", ""),
+    (14, "A5", "out", ""),
+    (15, "A6", "out", ""),
+    (16, "A7", "out", ""),
+    (17, "A8", "out", ""),
+    (18, "A9", "out", ""),
+    (19, "A10", "out", ""),
+    (20, "A11", "out", ""),
+    (21, "VSS", "gnd", "VSS = ground return to host (the one guaranteed ground)"),
+    (22, "A12", "out", ""),
+    (23, "A13", "out", ""),
+    (24, "A14", "out", ""),
+    (25, "A15", "out", ""),
+    (26, "D7", "bidir", ""),
+    (27, "D6", "bidir", ""),
+    (28, "D5", "bidir", ""),
+    (29, "D4", "bidir", ""),
+    (30, "D3", "bidir", ""),
+    (31, "D2", "bidir", ""),
+    (32, "D1", "bidir", ""),
+    (33, "D0", "bidir", ""),
+    (34, "RW", "out", "R/W"),
+    (35, "E", "out", "E (816; NC on 6502/02)"),
+    (36, "BE", "in", "BE (NC on 6502)"),
+    (37, "PHI2", "in", "phi0/PHI2 clock in"),
+    (38, "P38", "flip", "SO (6502/02) / MX (816) -- direction flips"),
+    (39, "PHI2O_VDA", "out", "phi2-out (6502/02) / VDA (816)"),
+    (40, "RES", "in", "/RES (sensed + deadman-driven)"),
+]

@@ -73,7 +73,7 @@ BLOCKS = [
     ("SOM",       "SOM DF40 connectors  (CN1=BTB9900 CN2=C2399 CN3=C2400)"),
     ("USB3",      "USB3 / CH569  (+30MHz xtal)"),
     ("PROG",      "FT2232  (JTAG + UART)"),
-    ("CPU",       "APPLE BUS  (level shifters + 2x20 header + deadman)"),
+    ("CPU",       "APPLE BUS  (level shifters + J_CPU FFC + deadman)"),
 ]
 WMAX = {"CPU": 130.0, "SOM": 80.0}      # per-block max row width when packing a tray
 TRAY_TOP = 92.0                          # trays start below the board+tab

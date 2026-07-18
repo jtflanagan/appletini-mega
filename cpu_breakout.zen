@@ -1,0 +1,59 @@
+"""
+cpu_breakout — socket-side companion board for the appletini-mega carrier.
+
+Second board in this workspace (its own layout dir -> its own gerbers). It closes the CPU-socket
+interface the carrier reaches over FFC:
+
+    carrier FH12-40S FFC (J_CPU)  ->  40-cond 0.5 mm FFC ribbon  ->  J_FFC (here)  ->  DIP-40 plug
+
+It is a PASSIVE 1:1 fan-out: FFC pin N is wired straight to DIP socket pin N. Both ends are built
+from the SAME modules/cpu_ffc_map.zen as the carrier's J_CPU, so the two boards cannot drift -- one
+edit to CPU_PINMAP regenerates both.
+
+DIP-40 plug = two 1x20 0.1" MACHINED (turned) round-pin strips, 0.6" (15.24 mm) apart -- that pin
+field IS the DIP-40 footprint. Round/turned pins are REQUIRED: stamped square pins damage a DIP
+socket's round receptacles and contact poorly. The strips are BOTTOM-MOUNTED (pins protrude from the
+underside into the socket; J_FFC sits on top), with pins long enough to seat fully in the socket.
+LAYOUT: place J_DIP_L as the left column (P1 at the pin-1/notch corner, running down to P20), and
+J_DIP_R as the right column rotated 180deg so its P1 (=DIP 21) sits at the bottom next to J_DIP_L.P20
+-- the standard DIP pin wrap (1..20 down the left, 21..40 up the right).
+FAB NOTE: the generic PinHeader footprint drills ~1.0 mm holes (sized for square pins); tighten to
+suit the chosen turned-pin strip (~0.7-0.8 mm) before release.
+
+Electrically the breakout only adds a short passive stub (cable + fan-out traces); negligible on the
+1-2.8 MHz CPU bus (see docs/cpu_socket_pinout.md).
+"""
+
+load("modules/cpu_ffc_map.zen", "CPU_PINMAP")
+
+FH12 = Module("components/HRS_Hirose/FH12-40S-0_5SH_55/FH12-40S-0_5SH_55.zen")
+PinHeader = Module("@stdlib/generics/PinHeader.zen")
+
+Board(
+    name="appletini-cpu-breakout",
+    layout_path="layout_breakout",
+    layers=2,  # passive 1:1 fan-out -- 2 layers is plenty
+)
+
+GND = Net("GND")
+
+# One net per DIP pin, from the shared map (VSS collapses onto GND). Net name carries the DIP pin
+# number + role so the fan-out is self-documenting: FFC pin N and DIP-plug pin N share this net.
+_net = {}
+for (pin, role, _dir, _note) in CPU_PINMAP:
+    _net[pin] = GND if role == "VSS" else Net("DIP%d_%s" % (pin, role))
+
+# ---- J_FFC: receives the FFC ribbon from the carrier's J_CPU (same FH12-40S part) ----
+FH12(name="J_FFC", MH1=GND, MH2=GND, **{"P%d" % pin: _net[pin] for (pin, _r, _d, _n) in CPU_PINMAP})
+
+# ---- DIP-40 plug: two 1x20 machined round-pin strips, 0.6" apart (see header note) ----
+PinHeader(
+    name="J_DIP_L",  # left column = DIP pins 1..20 (top -> bottom)
+    pins=20, rows=1, mount="THT", pitch="2.54mm", gender="Male",
+    **{"P%d" % i: _net[i] for i in range(1, 21)},
+)
+PinHeader(
+    name="J_DIP_R",  # right column = DIP pins 21..40 (P_i -> DIP 20+i; placed 180deg, bottom = DIP21)
+    pins=20, rows=1, mount="THT", pitch="2.54mm", gender="Male",
+    **{"P%d" % i: _net[20 + i] for i in range(1, 21)},
+)
