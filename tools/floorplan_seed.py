@@ -15,8 +15,8 @@ spine. You then drag each recognizable, labeled cluster onto the board. The
 intended floorplan positions live in docs/board_floorplan.md "Concrete floorplan v2"
 (SOM centered; the on-board SOM anchor here uses SOM_DATUM_X = board centre).
 
-Also draws the board outline + finger tab (body = 152.4x69.85 mm rectangle with a
-38.1x12.7 mm notch cut from the upper-right corner; the 2.55" tab protrudes ~7.5 mm
+Also draws the board outline + finger tab (body = 101.6x69.85 mm rectangle with a
+12.7x38.1 mm notch cut from the upper-right corner, long edge running down; the 2.55" tab protrudes ~7.5 mm
 below, the AppleIIBus_Edge slot (found by footprint) filling a gap in the bottom edge). Coordinate
 frame = KiCad native (origin top-left, +y DOWN, mm); the whole board is shifted by
 ORIGIN so the body rectangle is centred on the A4-landscape sheet.
@@ -50,8 +50,8 @@ NET = os.path.join(os.path.dirname(__file__), "..", "layout", "default.net")
 # Lives in the REPO ROOT (not layout/) so `rm -rf layout` for a fresh sync keeps it.
 PLACE = os.path.join(os.path.dirname(__file__), "..", "placements.json")
 BW, BH = 101.6, 69.85           # card BODY rectangle (mm; 4.00"x2.75"); tab protrudes below BH
-NOTCH_W, NOTCH_H = 38.1, 12.7    # rectangular notch removed from the UPPER-RIGHT corner
-NOTCH_X = BW - NOTCH_W           # inner (left) x of the notch = 114.3 mm
+NOTCH_W, NOTCH_H = 12.7, 38.1    # rectangular notch from the UPPER-RIGHT corner; long edge runs DOWN
+NOTCH_X = BW - NOTCH_W           # inner (left) x of the notch = 88.9 mm
 
 # Board placement on the KiCad sheet. paper "A4" in layout.kicad_pcb = A4 LANDSCAPE
 # (297 x 210 mm). ORIGIN shifts the whole board frame so the body rectangle is centred
@@ -64,6 +64,32 @@ SOM_DATUM_X = BW / 2            # floorplan-v2: SOM CENTERED (was 55.0, left-of-
 TAB_HALF, TAB_TOP = 32.385, 3.175       # finger-tab half-width + top offset (from footprint)
 TAB_EDGE_GAP = 9.525                    # 0.375" from the tab's RIGHT edge to the card's right edge
 TAB_X = BW - TAB_EDGE_GAP - TAB_HALF     # tab centre -> right side of the card (= 110.49 mm)
+
+# ── JLC SMT assembly PLACEMENT minimums (emitted as a KiCad custom DRC file) ──────────────
+# These are NOT expressible via the zen DesignRules/Constraints schema: that schema (and the
+# compiled `pcb` binary behind it) only emits KiCad's BUILT-IN copper/hole/silk/mask rules.
+# Courtyard-referenced part spacing lives ONLY in a custom <board>.kicad_dru, so we emit it
+# here from the tool on every run -- the same way placements.json survives a `rm -rf layout`.
+# The .kicad_dru basename MUST match the board (layout.kicad_pcb -> layout.kicad_dru) so both
+# the KiCad GUI (live markers while hand-placing) and `kicad-cli pcb drc` auto-load it.
+# Numbers from JLCPCB SMT assembly capabilities, retrieved 2026-07-19:
+JLC_PART_CLEARANCE = 0.20   # min courtyard-to-courtyard gap, adjacent SMT parts (default DRC lets them TOUCH)
+JLC_PART_TO_EDGE = 1.0      # min component-body -> routed-edge gap (assembly rail / P&P nozzle access)
+# Footprint-name substrings for parts that SIT ON the board edge by design (card-edge fingers /
+# slots) -- exempt from the part-to-edge keepout, else they self-flag (they ARE the edge). The
+# card-edge connector's own milled slot still constrains OTHER parts (only the edge part itself
+# is exempted, via A.Reference).
+EDGE_EXEMPT_FP = ("edge",)
+
+# Footprint-name substrings for connectors whose INTERNAL land pattern is qualified vendor geometry,
+# not carrier routing: 0.5 mm-pitch signal pads, and plated shield/mount legs drawn as 0-annular PTH
+# pads with tight hole spacing. JLC assembles these parts as-drawn (U15 is literally their
+# JLCPCB_Assembly footprint), so relax board-setup clearance/hole/annular BETWEEN TWO PADS OF THE
+# SAME such part only -- the connector's clearance to OTHER parts stays at the full board minimum.
+VENDOR_CONN_FP = ("type-c",)
+VENDOR_CONN_CLEARANCE = 0.09   # keep the JLC copper floor even inside the vendor part
+VENDOR_CONN_HOLE = 0.15        # vendor mount-leg hole spacing (actuals ~0.16-0.17 mm)
+VENDOR_CONN_ANNULAR = 0.0      # shield/mount legs are 0-annular plated posts by design
 
 # Blocks in power<->USB spine order, with the label drawn over each tray.
 BLOCKS = [
@@ -196,7 +222,11 @@ def fp_rot(blk):
 
 
 def fp_size(blk):
-    """(w, h) of the footprint incl rotation, from pads + graphic points."""
+    """(w, h) of the footprint incl rotation, from pads + graphic points. Embedded (zone ...)
+    sub-blocks are dropped first: footprint zones (e.g. J1's "Bevel Area" keepout) store ABSOLUTE
+    board coords, so leaving them in would mix board-frame points with the local pad/graphic frame
+    and explode the bbox."""
+    blk = drop_blocks(blk, "(zone", lambda b: True)
     pts = []
     for m in re.finditer(r'\(pad\s+"[^"]*"\s+\S+\s+\S+\s*\(at\s+(-?\d[\d.]*)\s+(-?\d[\d.]*)'
                          r'(?:\s+-?\d[\d.]*)?\)\s*\(size\s+(-?\d[\d.]*)\s+(-?\d[\d.]*)\)', blk, re.S):
@@ -486,6 +516,122 @@ def inherent_pad_angles(blk):
     return out
 
 
+def _refs_by_fpname(pcb, substrings):
+    """Refdes of footprints whose library footprint-name contains any of `substrings` (lowercased).
+    Board-path-parametrized, so each board self-describes its rule exemptions."""
+    if not os.path.exists(pcb):
+        return []
+    t = open(pcb, encoding="utf-8", errors="replace").read()
+    refs = {fp_ref(b) for _, _, b in iter_fp(t)
+            if fp_ref(b) and any(s in fp_name(b).lower() for s in substrings)}
+    return sorted(refs)
+
+
+def edge_exempt_refs(pcb):
+    """Refdes of card-edge parts (fingers/slots) exempted from the part-to-edge keepout."""
+    return _refs_by_fpname(pcb, EDGE_EXEMPT_FP)
+
+
+def vendor_conn_refs(pcb):
+    """Refdes of vendor connectors whose internal land pattern is exempted from board-setup DRC."""
+    return _refs_by_fpname(pcb, VENDOR_CONN_FP)
+
+
+def dru_text(edge_exempt=(), vendor_internal=()):
+    """The custom KiCad DRC ruleset that approximates JLC's assembly placement minimums, plus
+    per-part exemptions. KiCad has no built-in knob for placement -- `courtyard_clearance` is
+    footprint<->footprint only, so part-to-edge uses physical_clearance against Edge.Cuts.
+    `edge_exempt` = refdes of card-edge parts that legitimately touch the edge (A is always the
+    footprint here, so an A.Reference test suffices). `vendor_internal` = refdes of connectors
+    whose OWN pad-to-pad clearance / hole spacing / annular is qualified vendor geometry; those
+    checks are relaxed only when BOTH items belong to the SAME such part. Custom rules override
+    board-setup for a matching pair (first match wins). Severity defaults to error, so
+    `kicad-cli pcb drc --severity-error` gates on it and the GUI shows live markers."""
+    edge_cond = "A.Type == 'Footprint' && B.Layer == 'Edge.Cuts'"
+    for r in edge_exempt:
+        edge_cond += f" && A.Reference != '{r}'"
+    exempt_note = (f"  # exempted (sit on the edge by design): {', '.join(edge_exempt)}"
+                   if edge_exempt else "")
+    out = f"""(version 1)
+# AUTO-GENERATED by tools/floorplan_seed.py -- do not hand-edit (regenerated every run;
+# a `rm -rf layout` + re-seed restores it). JLC SMT assembly placement minimums, which are
+# NOT covered by KiCad's built-in DRC. Source: JLCPCB SMT capabilities, retrieved 2026-07-19.
+
+# Part-to-part: courtyards must stay >= {JLC_PART_CLEARANCE} mm apart (stock DRC only forbids OVERLAP).
+(rule "jlc_part_spacing"
+	(constraint courtyard_clearance (min {JLC_PART_CLEARANCE}mm))
+	(condition "A.Type == 'Footprint' && B.Type == 'Footprint'"))
+
+# Part-to-edge: keep component bodies off the routed board edge (assembly rail / nozzle access).{exempt_note}
+(rule "jlc_part_to_edge"
+	(constraint physical_clearance (min {JLC_PART_TO_EDGE}mm))
+	(condition "{edge_cond}"))
+"""
+    if vendor_internal:
+        # both items belong to the SAME connector -> intra-part only; clearance to OTHER parts is
+        # untouched. annular is single-item, so it keys on A alone.
+        pair = " || ".join(f"(A.Reference == '{r}' && B.Reference == '{r}')" for r in vendor_internal)
+        single = " || ".join(f"A.Reference == '{r}'" for r in vendor_internal)
+        out += f"""
+# Vendor connector internal land pattern ({', '.join(vendor_internal)}): 0.5 mm-pitch pads +
+# 0-annular plated shield/mount legs = qualified JLC-assembly geometry, not carrier routing.
+# Relaxed ONLY between two pads of the SAME connector; clearance to other parts stays at board min.
+(rule "vendor_conn_clearance"
+	(constraint clearance (min {VENDOR_CONN_CLEARANCE}mm))
+	(condition "{pair}"))
+(rule "vendor_conn_hole"
+	(constraint hole_clearance (min {VENDOR_CONN_HOLE}mm))
+	(condition "{pair}"))
+(rule "vendor_conn_annular"
+	(constraint annular_width (min {VENDOR_CONN_ANNULAR}mm))
+	(condition "{single}"))
+"""
+    return out
+
+
+def dru_path_for(pcb):
+    """`<board>.kicad_dru` beside the board -- the basename KiCad + kicad-cli auto-load."""
+    return os.path.splitext(pcb)[0] + ".kicad_dru"
+
+
+def write_dru(pcb=PCB):
+    """Emit the custom DRC ruleset next to `pcb`. Board-path-parametrized so the same helper
+    also covers layout_breakout/ (`floorplan_seed.py --dru layout_breakout/layout.kicad_pcb`)."""
+    path = dru_path_for(pcb)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(dru_text(edge_exempt=edge_exempt_refs(pcb),
+                         vendor_internal=vendor_conn_refs(pcb)))
+    return path
+
+
+def check_drc(pcb=PCB):
+    """Run KiCad's CLI DRC (auto-loads the sibling .kicad_dru) as a placement/manufacturability
+    gate. Returns the count of error-severity RULE violations (incl. our custom part-spacing /
+    part-to-edge / vendor rules) -- 0 == pass. Deliberately IGNORES unconnected items: the board
+    is unrouted at the floorplan stage, so every net reads unconnected (default severity error);
+    counting them via kicad-cli's --exit-code-violations would make the gate always fail here.
+    Unconnected + parity counts are printed for information only."""
+    import subprocess, json as _json
+    tmp = os.path.join(os.path.dirname(pcb), "_drc_gate.json")
+    subprocess.run(["kicad-cli", "pcb", "drc", "--severity-error", "--schematic-parity",
+                    "--format", "json", "--output", tmp, pcb],
+                   capture_output=True, text=True)
+    try:
+        with open(tmp, encoding="utf-8") as f:
+            d = _json.load(f)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    viol = d.get("violations", [])
+    unconn = d.get("unconnected_items", [])
+    parity = d.get("schematic_parity", [])
+    for v in viol:
+        print(f"  DRC {v.get('type','?')}: {v.get('description','')}")
+    print(f"rule violations: {len(viol)}   (unrouted: {len(unconn)} unconnected, "
+          f"{len(parity)} parity -- informational)")
+    return len(viol)
+
+
 def run(move=True):
     place, labels = compute() if move else ({}, [])
     t = open(PCB, encoding="utf-8", errors="replace").read()
@@ -535,6 +681,9 @@ def run(move=True):
     t = ungroup_placed(t, load_placements())
     t = outline_and_labels(t, labels)
     open(PCB, "w", encoding="utf-8").write(t)
+    # Emit the JLC placement-rule .kicad_dru alongside the board every run, so it survives the
+    # `rm -rf layout` regen the same way the outline + placements do.
+    write_dru(PCB)
     return len(place), labels
 
 
@@ -552,10 +701,26 @@ if __name__ == "__main__":
         print("  re-run `floorplan_seed.py` (no flag) any time to restore them + ungroup")
     elif "--outline-only" in sys.argv[1:]:
         run(move=False)
-        print("re-added board outline + tab; placed parts ungrouped (footprints untouched)")
+        print(f"re-added board outline + tab; placed parts ungrouped (footprints untouched)")
+        print(f"  wrote {os.path.relpath(dru_path_for(PCB))} (JLC placement DRC rules)")
+    elif "--dru" in sys.argv[1:]:
+        # Emit ONLY the .kicad_dru for a given board (default: main board). Lets the breakout
+        # board pick up the same rules: `floorplan_seed.py --dru layout_breakout/layout.kicad_pcb`.
+        args = sys.argv[1:]
+        pcb = args[args.index("--dru") + 1] if args.index("--dru") + 1 < len(args) else PCB
+        print(f"wrote {os.path.relpath(write_dru(pcb))} (JLC placement DRC rules)")
+    elif "--check" in sys.argv[1:]:
+        # Seed the board, then gate on KiCad DRC (custom rules incl. part spacing). Non-zero exit
+        # on any error-severity violation, so this doubles as a CI/pre-commit manufacturability gate.
+        run(move=True)
+        rc = check_drc(PCB)
+        print("DRC clean" if rc == 0 else f"DRC found violations (kicad-cli exit {rc})")
+        sys.exit(rc)
     else:
         n, labels = run(move=True)
         print(f"placed {n} footprints (placements.json overrides + labeled trays) + outline/tab:")
         for _, _, text in labels:
             print(f"  • {text}")
         print("  (captured parts placed & ungrouped; the rest stay grouped in trays)")
+        print(f"  wrote {os.path.relpath(dru_path_for(PCB))} (JLC placement DRC rules; "
+              f"run with --check to gate on it)")
