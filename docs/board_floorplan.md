@@ -35,9 +35,11 @@ Tang Mega SOM's three DF40 connectors, so the prior board's **internal placement
 SOM + subsystem placement is a clean-sheet exercise driven by `docs/som_placement.md` (the DF40
 C2399/C2400/BTB9900 geometry).
 
-- Prior outline: **4.000" × 2.750"** (101.6 × 69.85 mm) rectangle. The **2.750" height is the Apple II
-  card standard → FIXED axis** (vertical in the case). **Length grows** — start target **6.000"
-  (152.4 mm)** (was 4"; allowed longer, up to ~7").
+- Outline: **4.000" × 2.750"** (101.6 × 69.85 mm) rectangle. The **2.750" height is the Apple II
+  card standard → FIXED axis** (vertical in the case). **Length = 4.000" (101.6 mm), decided
+  2026-07-19** — briefly targeted 6" for routing elbow room, but pulled back to 4" to keep bus trace
+  runs short; the bottom-side-SDRAM-under-SOM decision (below) removed the need for a wide right
+  field, so the extra length wasn't buying anything. Slot allows up to ~7" if ever needed.
 - Slot edge = footprint **`AppleIIBus_Edge`** (`/mnt/c/repos/appletini/v3/appletini_board/appletini.pretty/
   AppleIIBus_Edge.kicad_mod`): **50 pads = 25 fingers × 2 sides** (F.Cu + B.Cu), **0.1" (2.54 mm) pitch,
   2.400" pad span**, tab ~2.55" wide with insertion chamfers + its own Edge.Cuts. Reuse as-is.
@@ -52,7 +54,7 @@ C2399/C2400/BTB9900 geometry).
 
 `Board()` has no outline parameter — the **edge cuts are drawn in KiCad**. `pcb layout
 appletini_mega.zen` generates the real board (all footprints + ratsnest) and opens KiCad; draw the
-6.000"×2.750" outline + finger tab, place the `AppleIIBus_Edge` slot footprint on the bottom edge,
+4.000"×2.750" outline + finger tab, place the `AppleIIBus_Edge` slot footprint on the bottom edge,
 then floorplan the big blocks. `pcb layout --temp` gives a throwaway practice board.
 
 **⚠ Regen preservation (tested, pcb v0.4.5) — NOT what the earlier note claimed:** a **sync** regen
@@ -75,7 +77,7 @@ sorts the footprints into **labeled, non-overlapping staging trays**.
 
 **Why trays, not floorplan positions (learned the hard way):** 136 *real* footprints — a 52 mm 2×20
 header, 8 mm ICs, 23 mm DF40s, dozens of 0402s — **do not fit legibly at their floorplan positions on
-a 152×70 mm board.** Packed that tight the bodies overlap into mush and you can't tell the blocks
+a ~102×70 mm board.** Packed that tight the bodies overlap into mush and you can't tell the blocks
 apart (rev 1 tried this — it failed). So instead each block is laid out as a tidy cluster with spacing
 taken from **each footprint's real bounding box** (row-packed, zero body overlap), stacked in a column
 of labeled trays **below the board**, ordered along the power↔USB spine. A `gr_text` label over each
@@ -83,19 +85,20 @@ tray names the block. You then **drag each recognizable, labeled cluster onto th
 floorplan-v1 position from the table above. The `--outline-only` mode redraws just the outline.
 
 - **On the board already:** the **SOM DF40 connectors** (CN1=BTB9900, CN2=C2399, CN3=C2400 at their
-  real `som_placement.md` geometry about datum (55, 34.9)) and the **slot J2** (it forms the tab) —
-  both labeled in place. Everything else is in a tray.
+  real `som_placement.md` geometry about the board-centre datum (50.8, 34.9)) and the **slot** (found
+  by footprint, not refdes — it forms the tab) — both labeled in place. Everything else is in a tray.
 - **Trays (top→bottom):** POWER · SDRAM0 · SDRAM1 · USB3/CH569 · FT2232 · APPLE BUS.
 
-**Board outline + finger tab (seeded, matches the prior board's geometry):** the card **body** is the
-152.4 × 69.85 mm (6.000″ × 2.750″) rectangle; the **2.55″ finger tab protrudes ~7.5 mm below** the
+**Board outline + finger tab (seeded):** the card **body** is the
+101.6 × 69.85 mm (4.000″ × 2.750″) rectangle; the **2.55″ finger tab protrudes ~7.5 mm below** the
 body bottom edge. The seeder draws the top/left/right edges full and the **bottom edge in two pieces
-with a gap** for the tab (gap = TAB_X ± 32.385 mm), positions the `AppleIIBus_Edge` slot (J2) so its
-own Edge.Cuts (tab verticals + 45° insertion chamfers + insertion edge) land exactly on the gap
-endpoints — J2 origin = `(TAB_X, body_bottom + 3.175)`. `TAB_X` is derived from **`TAB_EDGE_GAP =
-9.525 mm (0.375″)` between the tab's right edge and the card's right edge** → tab on the **right side**
-of the card, centre at 110.49 mm (tab spans X[78.10, 142.88]). Change `TAB_EDGE_GAP` if the target
-slot wants the tab elsewhere.
+with a gap** for the tab (gap = TAB_X ± 32.385 mm), positions the `AppleIIBus_Edge` slot (found by
+footprint) so its own Edge.Cuts (tab verticals + 45° insertion chamfers + insertion edge) land
+exactly on the gap endpoints — slot origin = `(TAB_X, body_bottom + 3.175)`. `TAB_X` is derived from
+**`TAB_EDGE_GAP = 9.525 mm (0.375″)` between the tab's right edge and the card's right edge** → tab on
+the **right side** of the card, centre at 59.69 mm (tab spans X[27.30, 92.07]). Change `TAB_EDGE_GAP`
+if the target slot wants the tab elsewhere. (There is also a 38.1 × 12.7 mm notch cut from the
+upper-right corner for the barrel-jack DC-cable clearance — see the seeder header.)
 The tab's `body_bottom + 3.175` offset and ±32.385 half-width come from the footprint's own geometry,
 cross-checked against `/mnt/c/repos/appletini/v5/AppleTini_board_v5_2` (tab gap 64.76 mm, protrusion
 7.5 mm, slot origin 3.18 mm below the body edge — all reproduced).
@@ -136,7 +139,7 @@ This needs an explicit decision once we know whether the slot edge is used elect
 
 | Block | Parts | Wants to be near | Notes |
 |---|---|---|---|
-| **SOM** | GW5AT-60 module (45×35 mm, 3 mm standoffs) | — (free variable) | position dictates where the rest lands; C2399 top / C2400 bottom / BTB9900 left, "C" opens right |
+| **SOM** | GW5AT-60 module (45×35 mm, 1.5 mm DF40C stack/standoffs) | — (free variable) | position dictates where the rest lands; C2399 top / C2400 bottom / BTB9900 left, "C" opens right |
 | **SDRAM U_LO** (32-bit bank) | 1× AS4C16M16SA | **C2399** (BANK1/2) | Data DQ[15:0] + DQM0/1 bank-local, escape toward C2399. **Sources the SHARED cmd/clk/addr bus** that also feeds U_HI (see the shared-bus note, 2026-07-10). |
 | **SDRAM U_HI** (32-bit bank) | 1× AS4C16M16SA | **C2400** (BANK6/7/8) | Data DQ[31:16] + DQM2/3 bank-local; C2400 clean field (P1–P50) is the OUTER row → escapes outward. Its cmd/clk/addr are **not** bank-local — they arrive via the shared bus from U_LO/C2399. |
 | **USB3 bridge** | CH569 + 30 MHz xtal + USB3 conn | HSPI connector (BANK2 region) | short 90 Ω SS pair to the edge connector |
@@ -150,9 +153,18 @@ of cable egress.
 
 ## Envelope / height constraints
 
-- SOM sits on 3 mm standoffs over the carrier (BTB stack) + its own component height; the underside
-  of the carrier is usable. Which **face** the SOM goes on (and whether it clears the neighboring
-  slot card) is open — depends on slot pitch of the target machine.
+- **SOM↔carrier mezzanine gap = 1.5 mm** (measured, 2026-07-19). The SOM BTB halves are Hirose
+  `DF40C-100DP`/`DF40C-80DP` (plug); the carrier has the `...DS` receptacles. `DF40C` with no
+  height digit = **1.5 mm** mated stacking height (DF40 datasheet decoder). Mounting standoffs must
+  therefore be ~1.5 mm to stay coplanar with the connectors — **not** the 3 mm assumed in earlier
+  drafts. (SOM mounting holes are 4×Ø2.15 for M2.)
+- **The SOM's mating (carrier-facing) face is densely populated** with bottom-side passives across
+  its whole area, including the right-hand region (SOM mechanical drawing, `04_Mechanical_drawing/
+  Tang_Mega_138K_60K_SOM.pdf`, the view carrying the three DF40 connectors). Those parts hang
+  ~0.5 mm into the 1.5 mm gap → **no usable top-side volume under the SOM.** See the SDRAM
+  bottom-side decision below.
+- The **underside of the carrier** faces away from the SOM into open slot space (~1" Apple II
+  slot pitch) and is the usable face for parts that want to live under the SOM footprint.
 - ~30% area utilization expected; **routing density**, not area, is the real constraint (6-layer).
 
 ## Decisions locked (2026-07-08)
@@ -161,8 +173,8 @@ of cable egress.
 - **Slot edge = purely mechanical, not even ground.** Interface with the (noisy) motherboard ONLY at
   the single star-point of the CPU socket. → resolves the grounding topology: **single-point ground
   via ribbon pin 21**, slot fingers floating.
-- **Outline = 2.750" height (fixed) × 6.000" length (start target)**, reusing the prior board's
-  `AppleIIBus_Edge` slot footprint.
+- **Outline = 2.750" height (fixed) × 4.000" length** (decided 2026-07-19; briefly targeted 6" then
+  pulled back — see mechanicals), reusing the prior board's `AppleIIBus_Edge` slot footprint.
 - **SOM orientation = HORIZONTAL, reference orientation, "C" opens toward the USB (right) end.**
   SOM long-axis runs along the board length → only **35 mm tall**, which is what buys the ~19 mm
   top strip the Apple-bus block needs. (The vertical/90°-rotated alternative gives the cleanest
@@ -179,8 +191,9 @@ of cable egress.
   every tall part). This keeps inner/outer rows exactly as documented in `som_placement.md` (a
   bottom-mount mirror would flip them and lose the SDRAM1-escapes-outward geometry). **Design rule:**
   all tall parts (SOM, barrel jack, USB-C, electrolytics) on the **top/component face**;
-  **bottom face = low-profile SMD only** (min profile — small decoupling may still tuck under the SOM in
-  the ~3 mm standoff gap).
+  **bottom face = low-profile SMD only** (min profile). Note: the ~1.5 mm mezzanine gap under the SOM
+  is NOT usable (populated SOM underside — see Envelope section); bottom-face parts under the SOM go on
+  the carrier's *outer* bottom copper (L6), which is what enables the bottom-side SDRAM placement.
 
 ## Concrete floorplan v1 (2026-07-08) — SUPERSEDED by v2 below
 
@@ -230,7 +243,12 @@ in KiCad after `pcb layout` generates the footprints — not final routed positi
 **Deferred/forgiving:** SDRAM1 is drawn under C2400 but is the *most forgiving* bus — if the finger
 keep-out squeezes the under-SOM band, **nest it in the mouth** (right of the SOM) instead; either works.
 
-## Concrete floorplan v2 (2026-07-09) — CURRENT
+## Concrete floorplan v2 (2026-07-09) — SUPERSEDED by v3 below
+
+> **Superseded 2026-07-19 by floorplan-v3** (card pulled from 6" back to 4"; both SDRAMs moved to the
+> BOTTOM copper under the SOM, vacating the right field). Kept for the bank-coherence rationale
+> (BTB9900 bridges left, SOM centered) which v3 inherits. The X ranges below assume the old 152.4 mm
+> width — read v3 for the actual block placement.
 
 Chosen after the first wiring pass. Same SOM orientation/mount/grounding decisions as v1
 (all still locked), but a different block arrangement that is **more bank-coherent**: the two
@@ -288,8 +306,71 @@ Working frame: **origin = bottom-left, +x right, +y up, mm.** Board = `(0,0)…(
   the *data*+DQM halves are forced by bank locality (U_LO=BANK1/2, U_HI=BANK6/7/8), matching the
   wiring in `appletini_mega.zen`. As of 2026-07-10 the two are one 32-bit bank on a shared
   cmd/clk/addr bus — see the shared-bus note below.
-- Seeder (`tools/floorplan_seed.py`) updated: SOM anchor datum → board centre (76.2). Trays are still
-  a staging aid below the board — drag each labeled cluster to its target above.
+- Seeder (`tools/floorplan_seed.py`) updated: SOM anchor datum → board centre (`SOM_DATUM_X = BW/2`).
+  Trays are still a staging aid below the board — drag each labeled cluster to its target above.
+
+## Concrete floorplan v3 (2026-07-19) — CURRENT
+
+Two changes from v2, which turn out to reinforce each other: the card is pulled from 6" back to
+**4.000" (101.6 mm)** to keep bus runs short, and **both SDRAMs move to the bottom copper (L6) under
+the SOM footprint** (the 1.5 mm DF40C mezzanine gap can't take them on top — see the SDRAM
+bottom-side decision above). Moving the SDRAMs *under* the SOM vacates the entire right field, which
+is exactly the space the 50.8 mm width reduction removed — so nothing is crowded out. The result is
+three clean vertical bands, with the memory hidden on the back:
+
+- **Left band (x≈2–27):** the two **BTB9900 bridges** — CH569/HSPI + FT2232/JTAG — plus power, all
+  escaping straight into CN1 on the SOM's left edge. Unchanged from v2.
+- **Center (x≈28–73):** **SOM on top; both SDRAMs on the bottom (L6)** directly beneath it.
+- **Right band (x≈74–100):** the **Apple-bus glue**, which now gets the whole right of the SOM to
+  itself (SDRAM no longer shares it).
+
+SOM orientation/mount/grounding decisions from v1/v2 all still hold (horizontal, top-mount, single
+star-point ground). Working frame: **origin = bottom-left, +x right, +y up, mm.** Board =
+`(0,0)…(101.6, 69.85)`, SOM datum = board centre `(50.8, 34.9)`.
+
+```
+ y69.85 ┌───────────────────────────────────────────────┐
+        │ ┌─ POWER ───┐                  ┌ Apple glue ─┐ │
+        │ │ barrel    │   ┌─ SOM 45×35 ─┐│ 5×'245      │ │
+ ~50    │ │ 2×MPM3620 │ C │ C2399(top)▔▔││ 2×'T45      │ │
+        │ ├───────────┤ N ┌────────────┐│ deadman     │ │ → ribbon
+ ~35    │ │ CH569  SS►│─9─│ FPGA        ││└─────────────┘│   drops to
+        │ │ 30M xtal  │ 9 │[U_LO][U_HI] ││                │   //e CPU
+        │ ├───────────┤ 0 │ on L6 (bot) ││                │   socket
+ ~18    │ │ FT2232    │ 0 └────────────┘│                │
+        │ │ USB-C ►   │   C2400(bot)▁▁  │                │
+ ~13    │ └───────────┘   ┌═ CPU FFC ═┐ │                │
+ ~12    │ · · · · · · finger keep-out · · · · · · · · · · │
+ y0     └══════════[ slot fingers, bottom edge ]═════════┘
+       x0  left: pwr+bridges   center: SOM   right: glue  x101.6
+              (SDRAM U_LO/U_HI on the BOTTOM, under the SOM)
+```
+
+**Block targets** (bottom-left origin, mm; ± a few mm — refine in KiCad):
+
+| Block | X range | Y range | Anchor / why |
+|---|---|---|---|
+| **SOM body** (45×35) | ~28.3 – 73.3 | ~17.4 – 52.4 | **datum = board centre (50.8, 34.9).** C opens right. |
+| — BTB9900 (CN1, L, vert) | ~31 (x) | ~27 – 43 | SOM left edge → faces the left bridges; HSPI(BANK5)+JTAG/config(BANK12/3) escape left. |
+| — C2399 (CN2, top, horiz) | ~33 – 56 | ~48 – 51 | SDRAM0 data (BANK1/2); sources the shared cmd/clk/addr bus. |
+| — C2400 (CN3, bot, horiz) | ~33 – 56 | ~18 – 22 | SDRAM1 data (BANK6/7/8). |
+| **Power** (2×MPM3620A) | 2 – 27 | ~44 – 68 | Upper-left; barrel on the left short edge; upper-right corner notch clears its DC cable. |
+| **CH569 + SS USB3** | 2 – 27 | ~24 – 43 | Mid-left; short HSPI run right into CN1; SS pair to a left-edge USB-C. |
+| **FT2232 + USB-C** | 2 – 27 | ~4 – 24 | Bottom-left; JTAG/UART up into CN1. |
+| **SDRAM U_LO** (→ C2399) — **BOTTOM / L6** | ~38 – 51 | ~23 – 46 | Under the SOM, **vertical (pads L/R)**, clear of the 41×31 MH rect; data+DQM (BANK1/2) escape up to CN2 via the L1↔L6 via field. |
+| **SDRAM U_HI** (→ C2400) — **BOTTOM / L6** | ~53 – 66 | ~23 – 46 | Parallel to U_LO; data+DQM (BANK6/7/8) escape down to CN3. Shared cmd/clk/addr runs **L→R between the two** — keep them close to bound the multidrop stubs. |
+| **Apple glue** (5×'245, 2×'T45, deadman) | ~74 – 100 | ~16 – 55 | Far-right band (whole right of the SOM now — SDRAM vacated it). A-side ← FPGA GPIO on C2400 spill. |
+| **CPU FFC `J_CPU`** | ~50 – 74 | ~13 – 19 | FH12-40S (~24 mm, low-profile), **low/center-right near the slot** — flat FFC exits toward the //e CPU socket via the breakout board. |
+| **Slot fingers** | ~27.3 – 92.1 | 0 – ~2 | Bottom edge (tab centre 59.69). Floating (mechanical only). |
+
+**Open at KiCad time:**
+- **SDRAM escape via field** is the main new SI item — see the "SDRAM lives on the BOTTOM" rules
+  above (0.40/0.20 vias, 0.60 mm anti-pad at 0.10 mm zone clearance, ≥0.80 mm staggered pitch,
+  L3 3V3 continuity check). Drop the vias in the open copper inboard of the BTB, not in the 0.4 mm fan.
+- **Apple glue in ~26 mm of width** (x74–100) is tighter than v2's right field — if the 5×'245 +
+  2×'T45 + deadman don't fit the band comfortably, spill the most forgiving of them to the bottom
+  copper too (the second-side setup is already paid for — see the cost note above).
+- Confirm the CPU FFC and right-band glue clear the finger keep-out (y≲12).
 
 ## SDRAM = one 32-bit bank on a shared bus (2026-07-10)
 
@@ -322,7 +403,58 @@ This is an intentional trade: a shared bus costs a cross-field multidrop route +
 but halves the FPGA ball count for control (~21 balls freed) and gives a true 32-bit word with
 4-byte write granularity. SDRAM remains the most forgiving of the board's buses.
 
+### SDRAM lives on the BOTTOM, under the SOM footprint (decided 2026-07-19)
+
+**Decision:** place **both** AS4C16M16SA on the **carrier's bottom copper (L6)**, directly under
+the SOM footprint outline — one tucked under the right side of the SOM (oriented vertically, pads
+L/R, clear of the 41×31 mm mounting-hole rectangle), the second parallel just to its right. The
+shared address/command bus then runs a clean left-to-right multidrop on L6 to hit both chips.
+(Modeled on the N2360 layout — "under the module" means *under the copper*, not in the mezzanine
+gap.)
+
+**Why bottom, not top:** the SOM mezzanine gap is only **1.5 mm** (DF40C, see Envelope section)
+and the SOM's mating face is carpeted with bottom-side passives that eat ~0.5 mm of it. A 54-pin
+TSOP-II SDRAM is ~1.2 mm tall → it collides on the top side. The carrier's bottom face points into
+open slot space, so the DF40 stack height stops mattering entirely and 1.2 mm is trivially clear.
+
+**Address escape via field (the SI/plane concern):** the shared addr/cmd bus (~30 nets) comes off
+the SOM BTB on L1 and must reach the L6 SDRAMs → one via per net (it's a shared bus + both chips on
+L6, so ~30 is the floor, not 2×). Data (32 DQ) via similarly but well outside the tight fan. Rules,
+so the field doesn't swiss-cheese the planes (stack is L1 SIG / L2 GND / L3 3V3 / L4 SIG / L5 GND /
+L6 SIG — L1 & L6 both GND-referenced):
+
+- **Escape on L1 first, via down in the OPEN copper** inboard of / just past the BTB — never drop
+  vias inside the 0.4 mm DF40 fan.
+- **Via = 0.40 mm pad / 0.20 mm drill** (enforced: it's the `50Ohm SE` netclass default in
+  `appletini_mega.zen`, and a predefined via size). 0.20 mm drill = 8:1 aspect on 1.6 mm = JLC
+  **standard** plating; the 0.15 mm floor (10.7:1) would be advanced/upcharge. L1↔L6 = full through
+  via → **no stub**.
+- **Anti-pad = 0.60 mm** = drill + 2×copper_to_hole(0.20). This only materializes if the GND/3V3
+  **zone clearance is set to 0.10 mm** at pour (still > JLC's 0.09 min); at the default 0.20 mm
+  clearance the anti-pad inflates to 0.80 mm. This is a **pour-time step, not enforced in config** —
+  don't lower the netclass `clearance` (0.2) to get it, that would tighten controlled-impedance
+  trace spacing board-wide.
+- **Keep ≥0.20 mm continuous copper web between anti-pads**, i.e. **≥0.80 mm via pitch, staggered
+  into 2 rows.** At these speeds/currents the web limit is plane *continuity*, not IR drop or SI —
+  the failure mode is anti-pads merging into a slot, so staggering is what prevents it.
+- **L3 (3V3) is the only power plane and feeds the SDRAM** — after routing, verify in the plane view
+  that a continuous 3V3 channel (a couple of webs wide) still reaches the SDRAM VDD via cluster; the
+  via field must not island it. Route the 3V3 feed vias in from the un-perforated side if it necks.
+  GND (L2/L5) needs no such check — poured solid both sides.
+- **Return current:** L1↔L6 both reference GND, so sprinkle **~4–6 GND stitching vias** through the
+  field. Address is slow single-ended — no need for one stitch per signal.
+
+**Cost:** going double-sided at JLC is a one-time ~$33 bump (Standard tier single→double setup
+$25→$50 + stencil $7.86→$15.72) plus ~$0.20/board of placement — negligible, and the marginal cost
+of *more* bottom parts is just joints, so put any other back-friendly passives down there too.
+
 ## Power block placement (2026-07-12)
+
+> **Seeder note (2026-07-19):** this section describes the *intended* hand-placement of the power
+> stage (the constructive buck hot-loop cluster). `tools/floorplan_seed.py` **no longer auto-generates
+> it** — the `place_power` cluster was removed and PWR is now a plain linear staging tray like every
+> other block (it sits in the upper-left band per floorplan-v3). Treat the escape map / clustering
+> below as the target to hand-place *to*, not what the seeder emits.
 
 The power stage is **two `MPM3620A` integrated-inductor buck modules** off the protected 12 V
 rail — 5 V and 3.3 V, independent (not cascaded) — plus the shared input-protection chain

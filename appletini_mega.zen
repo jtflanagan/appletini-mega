@@ -39,6 +39,8 @@ load(
     "Silkscreen",
     "SolderMask",
     "NetClass",
+    "PredefinedSizes",
+    "ViaDimension",
     "BASE_6L_NETCLASSES",
 )
 load("@stdlib/units.zen", "Impedance")
@@ -66,6 +68,15 @@ _netclasses = [nc for nc in BASE_6L_NETCLASSES if nc.name not in ("50Ohm SE", "9
         name="50Ohm SE",
         clearance=0.2,
         track_width=0.157,  # outer microstrip, coated (was 0.1461 GCPW)
+        # Escape via for the L1<->L6 transitions (SDRAM data+addr/cmd, HSPI): 0.40 mm pad /
+        # 0.20 mm drill. Smaller than the 0.5/0.3 netclass default to widen the plane pour in
+        # the dense escape field under the SOM, but 0.20 mm drill = 8:1 aspect on 1.6 mm = JLC
+        # STANDARD plating (0.15 mm floor would be 10.7:1 = advanced/upcharge). Full through via
+        # => no stub. Anti-pad = drill + 2*copper_to_hole(0.20) = 0.60 mm when the GND/3V3 zone
+        # clearance is set to 0.10 mm at pour; keep vias >=0.80 mm staggered pitch (2 rows) for a
+        # >=0.20 mm continuous copper web between anti-pads. See docs/board_floorplan.md.
+        via_diameter=0.40,
+        via_drill=0.20,
         color="#0000C2FF",
         single_ended_impedance=Impedance(50),
     ),
@@ -125,6 +136,11 @@ Board(
                 ),
             ),
             netclasses=_netclasses,  # 50R SE + 90R Diff re-derived for JLC microstrip (see above)
+            # Selectable in KiCad's via-size dropdown so the escape via can be placed by hand on
+            # any net too; the 50Ohm SE class above already defaults SDRAM/HSPI vias to this size.
+            predefined_sizes=PredefinedSizes(
+                via_dimensions=[ViaDimension(diameter=0.40, drill=0.20)],
+            ),
         ),
     ),
 )

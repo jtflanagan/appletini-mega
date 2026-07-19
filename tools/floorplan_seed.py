@@ -41,7 +41,7 @@ seeded board with `pcb layout appletini_mega.zen --no-sync`. After a sync, run a
 parts (do this before --capture, or the guard will refuse). `--outline-only` redraws just
 the outline (footprints untouched).
 """
-import re, sys, uuid, os, json, math
+import re, sys, uuid, os, json
 from collections import defaultdict
 
 PCB = os.path.join(os.path.dirname(__file__), "..", "layout", "layout.kicad_pcb")
@@ -49,7 +49,7 @@ NET = os.path.join(os.path.dirname(__file__), "..", "layout", "default.net")
 # Hand-tuned placement overrides captured from KiCad (--capture); see load_placements.
 # Lives in the REPO ROOT (not layout/) so `rm -rf layout` for a fresh sync keeps it.
 PLACE = os.path.join(os.path.dirname(__file__), "..", "placements.json")
-BW, BH = 152.4, 69.85           # card BODY rectangle (mm); tab protrudes below BH
+BW, BH = 101.6, 69.85           # card BODY rectangle (mm; 4.00"x2.75"); tab protrudes below BH
 NOTCH_W, NOTCH_H = 38.1, 12.7    # rectangular notch removed from the UPPER-RIGHT corner
 NOTCH_X = BW - NOTCH_W           # inner (left) x of the notch = 114.3 mm
 
@@ -79,16 +79,6 @@ WMAX = {"CPU": 130.0, "SOM": 80.0}      # per-block max row width when packing a
 TRAY_TOP = 92.0                          # trays start below the board+tab
 TRAY_GAP = 10.0                          # vertical gap between trays
 PAD = 2.0                                # gap between parts within a tray
-
-# POWER block placed ON the board under the notch (see place_power): the barrel jack anchors
-# on the notch's short side so its DC cable clears via the notch; the rail parts are
-# CONSTRUCTIVELY clustered around the buck (tight hot loop, small feedback loop), with the
-# input-protection chain feeding in from the jack side and the LDO downstream. Board frame.
-PWR_LEFT, PWR_TOP = 98.0, 16.0   # board-frame left/top edge of the clustered block
-PWR_CLEAR = 0.5                  # body-to-body gap when nudging parts apart (mm)
-# MPM3620A (QFN20) key pin LOCAL positions by role, from its .kicad_mod pads. Each rail's
-# passives are placed at these pins. Regenerate if the module footprint changes.
-MODULE_PINS = {"IN": (-0.27, -1.65), "OUT": (1.23, 1.85), "FB": (-1.43, -0.95), "EN": (-0.78, -1.85)}
 
 
 def iter_fp(t):
@@ -265,72 +255,6 @@ def pack_tray(refs, sizes, wmax):
     return pos, tw, cy + rowh
 
 
-def place_power(inst2ref, sizes):
-    """Constructive placement of the PWR rail parts (modules/power.zen): the input-protection
-    chain (jack / fuse / FET / TVS) feeds two MPM3620A buck-module rails (5 V and 3.3 V) placed
-    side by side, each with its 5 passives (Cin / Cout / EN pull-up / FB divider) clustered at the
-    module's pins. Returns {ref:(x,y,rot)} in LOCAL board-frame coords (KiCad, +y DOWN)."""
-    has = lambda n: n in inst2ref
-    R = lambda n: inst2ref[n]
-    place, boxes = {}, []
-    def ebox(ref, x, y, rot):
-        w, h = sizes[ref]
-        if rot in (90, 270):
-            w, h = h, w
-        return (x - w / 2, y - h / 2, x + w / 2, y + h / 2)
-    def clash(b):
-        return any(b[0] < c[2] - 1e-6 and c[0] < b[2] - 1e-6 and b[1] < c[3] - 1e-6 and c[1] < b[3] - 1e-6
-                   for c in boxes)
-    def put(ref, x, y, rot=0, ux=0.0, uy=0.0):
-        n = math.hypot(ux, uy) or 1.0
-        ux, uy = ux / n, uy / n
-        for k in range(200):                       # step outward until it clears neighbours
-            cx, cy = x + ux * 0.4 * k, y + uy * 0.4 * k
-            b = ebox(ref, cx, cy, rot)
-            if not clash(b):
-                place[ref] = (round(cx, 3), round(cy, 3), rot)
-                boxes.append(b)
-                return
-        place[ref] = (round(x, 3), round(y, 3), rot)
-        boxes.append(ebox(ref, x, y, rot))
-
-    def module(prefix, cx):
-        """place one MPM3620A rail cluster (module IC + 5 passives), module centred at (cx, 0)."""
-        if not has(prefix):
-            return
-        put(R(prefix), cx, 0, 0)
-        def at(suffix, pin, rot=0):                # start the passive at a module pin, push out
-            ref = prefix + suffix
-            if not has(ref):
-                return
-            px, py = MODULE_PINS[pin]
-            put(R(ref), cx + px, py, rot, px, py)
-        at("_CIN", "IN", 90)                        # input cap at IN
-        at("_COUT", "OUT", 90)                      # output cap at OUT
-        at("_REN", "EN", 90)                        # EN pull-up
-        at("_RTOP", "FB", 90)                       # feedback divider at FB...
-        if has(prefix + "_RBOT") and has(prefix + "_RTOP"):
-            x0, y0, _ = place[R(prefix + "_RTOP")]
-            put(R(prefix + "_RBOT"), x0, y0 - 1.8, 90, 0, -1)   # ...R_BOT stacked below R_TOP
-
-    module("U_BUCK5", 0.0)                           # 12V -> 5V rail cluster
-    module("U_BUCK33", 13.0)                         # 12V -> 3.3V rail cluster, to the right
-    # input protection chain LEFT of the modules: TVS -> FET (+ gate R) -> fuse (toward the jack)
-    lead = (min(b[0] for b in boxes) if boxes else -4.0) - 2.0
-    for n in ("D_IN", "Q_RP", "F_IN"):
-        if not has(n):
-            continue
-        lead -= sizes[R(n)][0] / 2
-        put(R(n), lead, 0, 0, -1, 0)
-        lead -= sizes[R(n)][0] / 2 + PWR_CLEAR + 0.4
-    # gate divider straddles the FET: R_RP (to GND) above, R_RP_TOP (to the P12V source) below
-    if has("R_RP") and has("Q_RP"):
-        x0, y0, _ = place[R("Q_RP")]; put(R("R_RP"), x0, y0 + sizes[R("Q_RP")][1] / 2 + 1.2, 0, 0, 1)
-    if has("R_RP_TOP") and has("Q_RP"):
-        x0, y0, _ = place[R("Q_RP")]; put(R("R_RP_TOP"), x0, y0 - sizes[R("Q_RP")][1] / 2 - 1.2, 0, 0, -1)
-    return place
-
-
 def load_placements():
     """Hand-tuned overrides captured from KiCad via `--capture`: {ref: [bx, by, rot]}
     in BOARD frame (ORIGIN is re-applied on top, so overrides follow the board if it is
@@ -407,38 +331,11 @@ def compute():
             place[mech[inst]] = (SOM_DATUM_X + dx, BH / 2 + dy)
     labels.append((30.0, 12.0, "SOM DF40 connectors (on board): CN1=BTB9900 CN2=C2399 CN3=C2400"))
     labels.append((TAB_X - 24, BH - 2, "slot finger tab (mechanical)"))
-    # POWER on-board: barrel jack on the notch's short side (cable clears via the notch),
-    # rail parts clustered just below + right of it under the notch's lower edge.
-    pwr = byblk.get("PWR", [])
-    jack = next((r for r in pwr if "JACK" in fpname.get(r, "").upper()), None)
-    if jack:
-        jw, jh = sizes[jack]
-        place[jack] = (NOTCH_X - jw / 2 - 1.0, NOTCH_H / 2, 180)   # against the notch short side
-    inst2ref = {i: r for i, r in sheet_instances("PWR").items() if r != jack and r not in place}
-    local = place_power(inst2ref, sizes)         # buck-centred constructive cluster (local)
-    if local:
-        def box(r):
-            x, y, rot = local[r]
-            w, h = sizes[r]
-            if rot in (90, 270):
-                w, h = h, w
-            return x - w / 2, y - h / 2
-        minx = min(box(r)[0] for r in local)     # translate cluster's top-left to PWR_LEFT/TOP,
-        miny = min(box(r)[1] for r in local)     # i.e. below the jack, just under the notch edge
-        ddx, ddy = PWR_LEFT - minx, PWR_TOP - miny
-        for r, (x, y, rot) in local.items():
-            place[r] = (x + ddx, y + ddy, rot)
-        # any PWR part place_power didn't handle -> tack on at the block's right edge
-        stragglers = [r for r in pwr if r != jack and r not in place]
-        sx = max((place[r][0] for r in local), default=PWR_LEFT) + 5.0
-        for r in stragglers:
-            place[r] = (sx, PWR_TOP, 0); sx += 4.0
-        labels.append((PWR_LEFT, PWR_TOP - 2.0, "POWER: 2x MPM3620A buck hot-loop + FB + protection clustered (rough draft)"))
-    # everything else -> labeled trays below the board
+    # every block (PWR included) -> labeled, row-packed trays below the board. PWR used to get
+    # a bespoke on-board constructive cluster (place_power); it's now a plain linear tray like
+    # the rest until we're ready to hand-place it.
     y = TRAY_TOP
     for key, text in BLOCKS:
-        if key == "PWR":                         # placed on-board under the notch, above
-            continue
         refs = [r for r in byblk.get(key, []) if r not in place]
         if not refs:
             continue
