@@ -163,6 +163,17 @@ USB_CH_VBUS = Net("CH_VBUS_SENSE")  # Pi5 USB3 SuperSpeed link
 USB_FT_VBUS = Net("FT_VBUS_SENSE")  # FT2232H JTAG/UART link
 
 # ============================================================================
+# BTB ASSIGNMENT LEDGER -- the (chip_port, som_ball, net) maps below record a PROPOSED som_ball for
+# every signal, but a ball is WIRED to the SOM connector ONLY when its functional net name is listed
+# in _ASSIGNED. Empty = clean slate: every signal stays connected WITHIN its module (guiding
+# ratsnest) but is RELEASED at the BTB, so the board isn't buried in premature cross-board airwires.
+# During routing-driven assignment, commit a signal by adding its net name here -- the som_ball stays
+# as the reference/proposed pick (promote it, or change it, as you decide). Power/GND/VCCIO are NOT
+# gated here: they are real shared rails, always wired.
+# ============================================================================
+_ASSIGNED = set()  # e.g. {"HSPI_HTCLK", "HSPI_HRCLK", "SDRAM_CLK"} -- functional net names, ball committed
+
+# ============================================================================
 # SDRAM pilot wiring: (sdram_port, som_ball, functional_net) triples.
 # One Net per functional name, passed to BOTH the SDRAM device port and the SOM ball port
 # so the two module-local nodes become the SAME physical net.
@@ -241,9 +252,10 @@ _SDRAM_MAP = [
 _snets = {nn: Net(nn, impedance=Impedance(50)) for (_sp, _sb, nn) in _SDRAM_MAP}
 _sdram_kw = {sp: _snets[nn] for (sp, _sb, nn) in _SDRAM_MAP}
 
-# _som_kw accumulates every SOM ball-port connection across subsystems (one big ball pool;
-# bank/connector are not routing constraints -- see CLAUDE.md). SDRAM first:
-_som_kw = {sb: _snets[nn] for (_sp, sb, nn) in _SDRAM_MAP}
+# _som_kw accumulates the SOM ball-port connections for signals whose ball is COMMITTED (net in
+# _ASSIGNED); released signals fall back to som_btb's SOM_<ball> singletons. One big ball pool;
+# bank/connector are not routing constraints (see CLAUDE.md). SDRAM first:
+_som_kw = {sb: _snets[nn] for (_sp, sb, nn) in _SDRAM_MAP if sb and nn in _ASSIGNED}
 
 # ============================================================================
 # HSPI wiring: CH569 (HSPI slave) <-> FPGA (HSPI master). (ch569_pin, som_ball, net) triples.
@@ -298,7 +310,7 @@ _HSPI_MAP = [
 # 50R single-ended, impedance-controlled: HSPI is a fast source-synchronous SDR bus (feeds the USB3
 # wall). Tag all 40 nets (data + the two GCLK clocks + handshake) to "50Ohm SE".
 _hnets = {nn: Net(nn, impedance=Impedance(50)) for (_p, _b, nn) in _HSPI_MAP}
-_som_kw.update({b: _hnets[nn] for (_p, b, nn) in _HSPI_MAP})
+_som_kw.update({b: _hnets[nn] for (_p, b, nn) in _HSPI_MAP if b and nn in _ASSIGNED})
 _hspi_ch_kw = {"CH_" + p: _hnets[nn] for (p, _b, nn) in _HSPI_MAP}
 
 # ============================================================================
@@ -353,7 +365,7 @@ _APPLE_MAP = [
     ("CPU_5V_ABSENT", "SOM_D21", "CPU_5V_ABSENT"),
 ]
 _anets = {nn: Net(nn) for (_p, _b, nn) in _APPLE_MAP}
-_som_kw.update({b: _anets[nn] for (_p, b, nn) in _APPLE_MAP})
+_som_kw.update({b: _anets[nn] for (_p, b, nn) in _APPLE_MAP if b and nn in _ASSIGNED})
 _cpu_kw = {p: _anets[nn] for (p, _b, nn) in _APPLE_MAP}
 
 # ============================================================================
@@ -372,7 +384,7 @@ _JTU_MAP = [
     ("FT_CFG_READY", "SOM_READY", "CFG_READY"),
 ]
 _jnets = {nn: Net(nn) for (_p, _b, nn) in _JTU_MAP}
-_som_kw.update({b: _jnets[nn] for (_p, b, nn) in _JTU_MAP})
+_som_kw.update({b: _jnets[nn] for (_p, b, nn) in _JTU_MAP if b and nn in _ASSIGNED})
 _prog_kw = {p: _jnets[nn] for (p, _b, nn) in _JTU_MAP}
 
 # ============================================================================
