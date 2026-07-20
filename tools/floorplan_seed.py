@@ -91,6 +91,20 @@ VENDOR_CONN_CLEARANCE = 0.09   # keep the JLC copper floor even inside the vendo
 VENDOR_CONN_HOLE = 0.15        # vendor mount-leg hole spacing (actuals ~0.16-0.17 mm)
 VENDOR_CONN_ANNULAR = 0.0      # shield/mount legs are 0-annular plated posts by design
 
+# ── Clock-capable (GCLK) BTB pad markers ─────────────────────────────────────────────────────
+# FPGA clock-capable SOM balls (Gowin JSON CFG=GCLK*) get a documentation ring on their BTB pad,
+# so clocks (HSPI HTCLK/HRCLK) land on legal balls during routing-driven assignment -- a wrong ball
+# is electrically fine, so DRC can't catch it. The ring is a footprint-LOCAL fp_circle on a doc
+# layer: KiCad rotates it onto the pad with the connector (no board-frame math), it's never
+# manufactured, and it regenerates each run from the JSON (die-correct) x som_btb.zen pin->ball --
+# so it survives a `pcb layout` sync. GCLK is the ONLY capability the design constrains against
+# (SDRAM is SDR = no DQS/X16; USB diff pairs go to the CH569, not FPGA LVDS).
+GOWIN_JSON = "/opt/gowin/IDE/data/device/GW5AT-60B/PBGA484A.json"
+SOM_BTB_ZEN = os.path.join(os.path.dirname(__file__), "..", "modules", "som_btb.zen")
+PLUG_REFDES = {"BTB9900": "CN1", "C2399": "CN2", "C2400": "CN3"}  # SOM plug -> board refdes (as placed)
+GCLK_LAYER = "Cmts.User"       # documentation layer (visible in KiCad, NOT on the fab)
+GCLK_RING_R = 0.3              # ring radius (mm) drawn on each clock-capable BTB pad
+
 # Blocks in power<->USB spine order, with the label drawn over each tray.
 BLOCKS = [
     ("PWR",       "POWER  (barrel + 2x MPM3620A buck: 5V / 3.3V)"),
@@ -632,6 +646,58 @@ def check_drc(pcb=PCB):
     return len(viol)
 
 
+def gclk_pads_by_refdes():
+    """{refdes: {pad#: ball}} of clock-capable BTB pads. Ball->GCLK from the Gowin device JSON
+    (CFG=GCLK*, die-specific ground truth); pad#->ball from som_btb.zen's `P#=_ball("SOM_<ball>")`
+    lines (per DF40 section); plug->refdes from PLUG_REFDES. Empty if the JSON isn't installed."""
+    if not os.path.exists(GOWIN_JSON) or not os.path.exists(SOM_BTB_ZEN):
+        return {}
+    d = json.load(open(GOWIN_JSON, encoding="utf-8"))
+    rows = [v for v in d.values() if isinstance(v, list) and v and isinstance(v[0], dict)
+            and "NAME" in v[0]][0]
+    gclk = {p["INDEX"] for p in rows if str(p.get("CFG", "")).startswith("GCLK")}
+    out, plug = defaultdict(dict), None
+    for line in open(SOM_BTB_ZEN, encoding="utf-8", errors="replace"):
+        h = re.search(r'#\s*=====\s*(\w+)', line)
+        if h and h.group(1) in PLUG_REFDES:
+            plug = h.group(1)
+        pm = re.search(r'P(\d+)=_ball\("SOM_(\w+)"\)', line)
+        if pm and plug and pm.group(2) in gclk:
+            out[PLUG_REFDES[plug]][int(pm.group(1))] = pm.group(2)
+    return out
+
+
+def _gclk_ring(px, py):
+    """A footprint-local ring (fp_circle, no fill) centred on a pad, on the doc layer."""
+    return (f'\n\t\t(fp_circle (center {px:g} {py:g}) (end {px + GCLK_RING_R:g} {py:g}) '
+            f'(stroke (width 0.1) (type default)) (fill none) (layer "{GCLK_LAYER}") '
+            f'(uuid "{uuid.uuid4()}"))')
+
+
+def inject_gclk_rings(t):
+    """Draw a documentation ring over each clock-capable BTB pad, as a footprint-LOCAL fp_circle so
+    KiCad rotates it onto the pad with the connector. Idempotent (strips prior rings first -- DF40
+    library footprints carry no Cmts.User circles, so only our markers are removed). Returns
+    (text, count)."""
+    pads = gclk_pads_by_refdes()
+    out, last, n = [], 0, 0
+    for a, b, blk in iter_fp(t):
+        out.append(t[last:a]); last = b
+        want = pads.get(fp_ref(blk))
+        if want:                                    # ONLY touch the GCLK connectors, never other parts
+            blk = drop_blocks(blk, "(fp_circle", lambda c: f'(layer "{GCLK_LAYER}")' in c)
+            rings = ""
+            for pm in re.finditer(r'\(pad "?(\d+)"?\s+\S+\s+\S+\s*\(at (-?\d[\d.]*) (-?\d[\d.]*)', blk):
+                if int(pm.group(1)) in want:
+                    rings += _gclk_ring(float(pm.group(2)), float(pm.group(3)))
+                    n += 1
+            if rings:
+                blk = blk[:-1].rstrip() + rings + "\n\t)"
+        out.append(blk)
+    out.append(t[last:])
+    return "".join(out), n
+
+
 def run(move=True):
     place, labels = compute() if move else ({}, [])
     t = open(PCB, encoding="utf-8", errors="replace").read()
@@ -679,6 +745,8 @@ def run(move=True):
     # the sync creates, and delete any group left empty. Un-captured parts stay grouped as
     # staging, so "ungrouped == placed" survives a re-sync (which re-groups everything).
     t = ungroup_placed(t, load_placements())
+    # Ring the clock-capable BTB pads (doc layer) so clocks get assigned to legal balls.
+    t, _ = inject_gclk_rings(t)
     t = outline_and_labels(t, labels)
     open(PCB, "w", encoding="utf-8").write(t)
     # Emit the JLC placement-rule .kicad_dru alongside the board every run, so it survives the
@@ -724,3 +792,6 @@ if __name__ == "__main__":
         print("  (captured parts placed & ungrouped; the rest stay grouped in trays)")
         print(f"  wrote {os.path.relpath(dru_path_for(PCB))} (JLC placement DRC rules; "
               f"run with --check to gate on it)")
+        ng = sum(len(v) for v in gclk_pads_by_refdes().values())
+        if ng:
+            print(f"  ringed {ng} clock-capable (GCLK) BTB pads on {GCLK_LAYER} (for clock assignment)")
