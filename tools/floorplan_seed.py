@@ -436,16 +436,21 @@ def outline_and_labels(t, labels):
         x, y = x - ox, y - oy
         return (abs(x) < e or abs(x - BW) < e or abs(y) < e or abs(y - BH) < e
                 or abs(x - NOTCH_X) < e or abs(y - NOTCH_H) < e)
-    def strip_edge(m):
+    def is_perim_edge(blk):
+        # strip a prior outline segment: an Edge.Cuts gr_line whose BOTH ends lie on the outline,
+        # at the OLD (0,0) frame (pre-centre files) or the current centred frame (migration + re-runs
+        # both stay clean). Paren-aware via drop_blocks below, so it matches SINGLE-line gr_lines AND
+        # the MULTI-line form `pcb layout` sync rewrites them into -- else the old outline survives a
+        # sync and we stack a second copy (self-intersecting outline).
+        if "Edge.Cuts" not in blk:
+            return False
+        m = re.search(r'\(start (-?[\d.]+) (-?[\d.]+)\).*?\(end (-?[\d.]+) (-?[\d.]+)\)', blk, re.S)
+        if not m:
+            return False
         p = [(float(m.group(1)), float(m.group(2))), (float(m.group(3)), float(m.group(4)))]
-        # strip if the segment lies on the outline at the OLD (0,0) frame (pre-centre
-        # files) or the current centred frame -> migration + re-runs both stay clean
-        for ox, oy in ((0.0, 0.0), (ORIGIN_X, ORIGIN_Y)):
-            if all(on_perim(qx, qy, ox, oy) for qx, qy in p):
-                return ""
-        return m.group(0)
-    t = re.sub(r'\(gr_line \(start (\S+) (\S+)\) \(end (\S+) (\S+)\)[^\n]*Edge\.Cuts[^\n]*\)\n?',
-               strip_edge, t)
+        return any(all(on_perim(qx, qy, ox, oy) for qx, qy in p)
+                   for ox, oy in ((0.0, 0.0), (ORIGIN_X, ORIGIN_Y)))
+    t = drop_blocks(t, "(gr_line", is_perim_edge)
     t = drop_blocks(t, "(gr_text", lambda b: 'layer "Cmts.User"' in b)
     # board outline (board frame): top edge notched at the upper-right corner, right +
     # left, and the bottom edge split around the finger-tab gap. Emitted at +ORIGIN.
